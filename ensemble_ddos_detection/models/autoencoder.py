@@ -15,7 +15,14 @@ from ensemble_ddos_detection.config import AutoencoderConfig
 
 def _get_device(device_str: str) -> torch.device:
     if device_str == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            try:
+                # Verify GPU actually works (catches incompatible compute capability)
+                torch.zeros(1, device="cuda")
+                return torch.device("cuda")
+            except Exception:
+                print("[Autoencoder] CUDA available but GPU incompatible, falling back to CPU")
+        return torch.device("cpu")
     return torch.device(device_str)
 
 
