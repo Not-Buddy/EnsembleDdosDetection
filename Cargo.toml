@@ -1,6 +1,32 @@
 [package]
-name = "EnsembleDdosDetection"
+name = "ensemble-ddos-detection"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Packet capture & protocol parsing
+pnet = "0.35"
+
+# ONNX Runtime inference
+ort = { version = "=2.0.0-rc.11", features = ["ndarray"] }
+ndarray = "0.16"
+
+# Serialization (load JSON configs)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Concurrent flow table
+dashmap = "6"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Time
+chrono = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+
+# Error handling
+anyhow = "1"

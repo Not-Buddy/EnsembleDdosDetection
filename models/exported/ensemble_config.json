@@ -1,12 +1,13 @@
 {
+  "type": "logistic_regression",
   "n_models": 3,
-  "weights": [
-    0.0,
-    0.7,
-    0.3
+  "coefficients": [
+    -1.4507773610253512,
+    14.2069486324836,
+    1.4928124146549517
   ],
-  "threshold": 0.2209090909090909,
-  "beta": 0.5,
+  "intercept": -3.366260157834922,
+  "threshold": 0.32517587939698495,
   "model_names": [
     "isolation_forest",
     "autoencoder",
@@ -14,13 +15,14 @@
   ],
   "optimized": true,
   "ensemble_result": {
-    "weights": [
-      0.0,
-      0.7,
-      0.3
+    "coefficients": [
+      -1.4507773610253512,
+      14.2069486324836,
+      1.4928124146549517
     ],
-    "threshold": 0.2209090909090909,
-    "best_metric_value": 0.966211684270069,
+    "intercept": -3.366260157834922,
+    "threshold": 0.32517587939698495,
+    "best_metric_value": 0.9712326719962792,
     "metric_name": "macro_fbeta_b0.5"
   }
 }

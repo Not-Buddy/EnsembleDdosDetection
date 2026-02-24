@@ -1,8 +1,100 @@
 {
-  "accuracy": 0.9879688059742622,
-  "precision": 0.9908092730319856,
-  "recall": 0.9961503867602086,
-  "f1": 0.9934726512159168,
-  "roc_auc": 0.9956941456773803,
-  "training_time_seconds": 78.36182498931885
+  "accuracy": 0.9900575932100637,
+  "precision": 0.9932367785299112,
+  "recall": 0.9959645020087545,
+  "f1": 0.9945987700525153,
+  "roc_auc": 0.9961958878170152,
+  "per_attack_type": {
+    "Benign": {
+      "count": 14675,
+      "detected": 13544,
+      "recall": 0.9229301533219761
+    },
+    "DrDoS_DNS": {
+      "count": 1832,
+      "detected": 1822,
+      "recall": 0.9945414847161572
+    },
+    "DrDoS_LDAP": {
+      "count": 711,
+      "detected": 710,
+      "recall": 0.9985935302390999
+    },
+    "DrDoS_MSSQL": {
+      "count": 3086,
+      "detected": 3085,
+      "recall": 0.9996759559300065
+    },
+    "DrDoS_NTP": {
+      "count": 60659,
+      "detected": 60505,
+      "recall": 0.9974612176264034
+    },
+    "DrDoS_NetBIOS": {
+      "count": 282,
+      "detected": 280,
+      "recall": 0.9929078014184397
+    },
+    "DrDoS_SNMP": {
+      "count": 1328,
+      "detected": 1327,
+      "recall": 0.9992469879518072
+    },
+    "DrDoS_UDP": {
+      "count": 5203,
+      "detected": 5201,
+      "recall": 0.999615606380934
+    },
+    "LDAP": {
+      "count": 937,
+      "detected": 937,
+      "recall": 1.0
+    },
+    "MSSQL": {
+      "count": 4260,
+      "detected": 4259,
+      "recall": 0.9997652582159624
+    },
+    "NetBIOS": {
+      "count": 313,
+      "detected": 313,
+      "recall": 1.0
+    },
+    "Portmap": {
+      "count": 329,
+      "detected": 307,
+      "recall": 0.9331306990881459
+    },
+    "Syn": {
+      "count": 24799,
+      "detected": 24689,
+      "recall": 0.9955643372716642
+    },
+    "TFTP": {
+      "count": 49386,
+      "detected": 49321,
+      "recall": 0.9986838375248046
+    },
+    "UDP": {
+      "count": 9152,
+      "detected": 9152,
+      "recall": 1.0
+    },
+    "UDP-lag": {
+      "count": 4450,
+      "detected": 4168,
+      "recall": 0.9366292134831461
+    },
+    "UDPLag": {
+      "count": 20,
+      "detected": 18,
+      "recall": 0.9
+    },
+    "WebDDoS": {
+      "count": 23,
+      "detected": 3,
+      "recall": 0.13043478260869565
+    }
+  },
+  "training_time_seconds": 56.254650592803955
 }
