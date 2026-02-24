@@ -143,3 +143,57 @@ def plot_confusion_matrix(
     fig.savefig(save_path, dpi=150)
     plt.close(fig)
     print(f"[Metrics] Confusion matrix saved to {save_path}")
+
+
+def evaluate_per_attack_type(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    attack_types: np.ndarray,
+    title: str = "Per-Attack-Type Detection Rates",
+) -> dict[str, dict[str, float]]:
+    """
+    Compute detection rate (recall) per attack type.
+
+    Args:
+        y_true: Binary ground truth (0=benign, 1=attack).
+        y_pred: Binary predictions.
+        attack_types: Original string labels (e.g. 'Syn', 'DrDoS_DNS', 'Benign').
+
+    Returns:
+        Dict mapping attack type → {count, detected, recall}.
+    """
+    unique_types = sorted(set(attack_types))
+    results: dict[str, dict[str, float]] = {}
+
+    print(f"\n{'=' * 65}")
+    print(f"  {title}")
+    print(f"{'=' * 65}")
+    print(f"  {'Attack Type':<20s} {'Count':>8s} {'Detected':>10s} {'Recall':>8s}")
+    print(f"  {'-' * 55}")
+
+    for atype in unique_types:
+        mask = attack_types == atype
+        count = int(mask.sum())
+        if count == 0:
+            continue
+
+        true_sub = y_true[mask]
+        pred_sub = y_pred[mask]
+
+        if atype.lower() == "benign":
+            # For benign: "detected" = correctly identified as benign (not flagged)
+            detected = int((pred_sub == 0).sum())
+            recall = detected / count
+            label = "Benign (TN rate)"
+        else:
+            # For attacks: "detected" = correctly flagged as attack
+            detected = int((pred_sub == 1).sum())
+            recall = detected / count
+            label = atype
+
+        results[atype] = {"count": count, "detected": detected, "recall": recall}
+        print(f"  {label:<20s} {count:>8,d} {detected:>10,d} {recall:>8.1%}")
+
+    print(f"{'=' * 65}\n")
+    return results
+

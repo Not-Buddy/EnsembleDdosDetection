@@ -2,7 +2,7 @@
 Dataset loader for the CIC-DDoS2019 dataset.
 
 Reads all parquet files, concatenates them, and binarizes labels
-into 0 (Benign) and 1 (Attack).
+into 0 (Benign) and 1 (Attack). Also preserves original attack type labels.
 """
 
 import pandas as pd
@@ -17,13 +17,16 @@ from ensemble_ddos_detection.config import (
 )
 
 
-def load_dataset(dataset_dir: Path = DATASET_DIR) -> tuple[pd.DataFrame, pd.Series]:
+def load_dataset(
+    dataset_dir: Path = DATASET_DIR,
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
     """
     Load and merge all CIC-DDoS2019 parquet files.
 
     Returns:
         X: DataFrame of numeric features (constant columns dropped).
         y: Series of binary labels (0 = Benign, 1 = Attack).
+        attack_types: Series of original string labels (e.g. 'Syn', 'DrDoS_DNS', 'Benign').
     """
     parquet_files = sorted(dataset_dir.glob("*.parquet"))
     if not parquet_files:
@@ -43,13 +46,14 @@ def load_dataset(dataset_dir: Path = DATASET_DIR) -> tuple[pd.DataFrame, pd.Seri
     if LABEL_COLUMN not in data.columns:
         raise KeyError(f"Label column '{LABEL_COLUMN}' not found in dataset")
 
-    # Convert to string for safe comparison (category dtype)
-    labels_raw = data[LABEL_COLUMN].astype(str).str.strip()
-    y = (~labels_raw.str.lower().eq(BENIGN_LABEL.lower())).astype(int)
+    # Preserve original attack type labels
+    attack_types = data[LABEL_COLUMN].astype(str).str.strip()
+    y = (~attack_types.str.lower().eq(BENIGN_LABEL.lower())).astype(int)
 
     benign_count = (y == 0).sum()
     attack_count = (y == 1).sum()
-    print(f"[Loader] Benign: {benign_count:,} | Attack: {attack_count:,}")
+    n_types = attack_types[y == 1].nunique()
+    print(f"[Loader] Benign: {benign_count:,} | Attack: {attack_count:,} ({n_types} types)")
 
     # ── Drop label + unwanted columns ──────────────────────────────────
     X = data.drop(columns=[LABEL_COLUMN], errors="ignore")
@@ -63,4 +67,4 @@ def load_dataset(dataset_dir: Path = DATASET_DIR) -> tuple[pd.DataFrame, pd.Seri
     X = X.select_dtypes(include=["number"])
     print(f"[Loader] Final feature count: {X.shape[1]}")
 
-    return X, y
+    return X, y, attack_types

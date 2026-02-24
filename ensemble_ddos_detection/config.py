@@ -86,13 +86,9 @@ class OneClassSVMConfig:
 
 @dataclass
 class QEnsembleConfig:
-    # Weight search grid resolution (steps per dimension)
-    weight_grid_steps: int = 20
-    # Metric to optimize
-    optimize_metric: str = "macro_fbeta"
-    # Beta for F-beta: <1 penalizes false positives more
+    # Beta for F-beta threshold tuning: <1 penalizes false positives more
     beta: float = 0.5
-    # Hard constraint: reject any weight/threshold combo below this benign recall
+    # Hard constraint: reject thresholds below this benign recall
     min_benign_recall: float = 0.85
 
 

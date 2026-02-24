@@ -41,6 +41,9 @@ class DataSplits:
     scaler: StandardScaler
     feature_names: list[str]
     n_features: int
+    # Attack type labels for per-type evaluation
+    attack_types_val: np.ndarray = field(default_factory=lambda: np.array([]))
+    attack_types_test: np.ndarray = field(default_factory=lambda: np.array([]))
     # Feature engineering metadata (for Rust inference)
     log_transformed_columns: list[str] = field(default_factory=list)
     dropped_mi_columns: list[str] = field(default_factory=list)
@@ -120,6 +123,7 @@ def _mutual_info_selection(
 def preprocess(
     X: pd.DataFrame,
     y: pd.Series,
+    attack_types: pd.Series | None = None,
     random_state: int = 42,
 ) -> DataSplits:
     """
@@ -148,6 +152,7 @@ def preprocess(
     feature_names = X.columns.tolist()
     X_np = X.values.astype(np.float64)
     y_np = y.values
+    atk_np = attack_types.values if attack_types is not None else np.full(len(y_np), "Unknown")
 
     # ── 3. Handle inf / NaN ────────────────────────────────────────────
     X_np[~np.isfinite(X_np)] = np.nan
@@ -168,6 +173,7 @@ def preprocess(
     X_benign = X_np[benign_mask]
     X_attack = X_np[~benign_mask]
     y_attack = y_np[~benign_mask]
+    atk_attack = atk_np[~benign_mask]
 
     print(f"[Preprocessor] Benign samples: {len(X_benign):,}")
     print(f"[Preprocessor] Attack samples: {len(X_attack):,}")
@@ -176,17 +182,28 @@ def preprocess(
     val_test_ratio = (VAL_RATIO + TEST_RATIO) / (TRAIN_RATIO + VAL_RATIO + TEST_RATIO)
     test_of_rem = TEST_RATIO / (VAL_RATIO + TEST_RATIO)
 
-    X_train, X_benign_rem = train_test_split(
-        X_benign, test_size=val_test_ratio, random_state=random_state
+    benign_indices = np.arange(len(X_benign))
+    train_idx, rem_idx = train_test_split(
+        benign_indices, test_size=val_test_ratio, random_state=random_state
     )
-    X_val_benign, X_test_benign = train_test_split(
-        X_benign_rem, test_size=test_of_rem, random_state=random_state
+    val_ben_idx, test_ben_idx = train_test_split(
+        rem_idx, test_size=test_of_rem, random_state=random_state
     )
+    X_train = X_benign[train_idx]
+    X_val_benign = X_benign[val_ben_idx]
+    X_test_benign = X_benign[test_ben_idx]
 
     # ── 7. Split attack: val / test (50/50) ────────────────────────────
-    X_val_attack, X_test_attack, y_val_attack, y_test_attack = train_test_split(
-        X_attack, y_attack, test_size=0.5, random_state=random_state
+    attack_indices = np.arange(len(X_attack))
+    val_atk_idx, test_atk_idx = train_test_split(
+        attack_indices, test_size=0.5, random_state=random_state
     )
+    X_val_attack = X_attack[val_atk_idx]
+    X_test_attack = X_attack[test_atk_idx]
+    y_val_attack = y_attack[val_atk_idx]
+    y_test_attack = y_attack[test_atk_idx]
+    atk_val = atk_attack[val_atk_idx]
+    atk_test = atk_attack[test_atk_idx]
 
     # ── 8. Combine val and test sets ───────────────────────────────────
     X_val = np.vstack([X_val_benign, X_val_attack])
@@ -194,11 +211,19 @@ def preprocess(
         np.zeros(len(X_val_benign), dtype=int),
         y_val_attack,
     ])
+    atypes_val = np.concatenate([
+        np.full(len(X_val_benign), "Benign"),
+        atk_val,
+    ])
 
     X_test = np.vstack([X_test_benign, X_test_attack])
     y_test = np.concatenate([
         np.zeros(len(X_test_benign), dtype=int),
         y_test_attack,
+    ])
+    atypes_test = np.concatenate([
+        np.full(len(X_test_benign), "Benign"),
+        atk_test,
     ])
 
     # ── 9. Fit scaler on train (benign only) ───────────────────────────
@@ -221,6 +246,8 @@ def preprocess(
         scaler=scaler,
         feature_names=feature_names,
         n_features=len(feature_names),
+        attack_types_val=atypes_val,
+        attack_types_test=atypes_test,
         log_transformed_columns=log_cols,
         dropped_mi_columns=dropped_mi_cols,
     )

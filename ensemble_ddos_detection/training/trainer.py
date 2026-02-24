@@ -24,6 +24,7 @@ from ensemble_ddos_detection.evaluation.metrics import (
     print_classification_report,
     plot_roc_curve,
     plot_confusion_matrix,
+    evaluate_per_attack_type,
 )
 
 
@@ -34,8 +35,8 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
         2. Train Isolation Forest
         3. Train Autoencoder
         4. Train One-Class SVM
-        5. Score validation set → optimize Q-Ensemble
-        6. Evaluate on test set
+        5. Score validation set → train Q-Ensemble (LR stacking)
+        6. Evaluate on test set (overall + per attack type)
         7. Save models + artifacts
 
     Returns:
@@ -48,8 +49,8 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     print("\n" + "=" * 60)
     print("  PHASE 1: Data Loading & Preprocessing")
     print("=" * 60)
-    X, y = load_dataset(config.dataset_dir)
-    splits = preprocess(X, y, random_state=config.random_state)
+    X, y, attack_types = load_dataset(config.dataset_dir)
+    splits = preprocess(X, y, attack_types=attack_types, random_state=config.random_state)
 
     # ── 2. Isolation Forest ────────────────────────────────────────────
     print("\n" + "=" * 60)
@@ -72,9 +73,9 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     svm_model = OneClassSVMModel(config.one_class_svm)
     svm_model.fit(splits.X_train)
 
-    # ── 5. Q-Ensemble Optimization ─────────────────────────────────────
+    # ── 5. Q-Ensemble (Learned Stacking) ──────────────────────────────
     print("\n" + "=" * 60)
-    print("  PHASE 5: Q-Ensemble Weight Optimization")
+    print("  PHASE 5: Q-Ensemble (Logistic Regression Stacking)")
     print("=" * 60)
     val_scores = [
         if_model.score(splits.X_val),
@@ -88,9 +89,8 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     # ── Individual model evaluation on validation set ──────────────────
     print("\n--- Individual Model Validation Results ---")
     model_names = ["Isolation Forest", "Autoencoder", "One-Class SVM"]
-    models = [if_model, ae_model, svm_model]
     for name, score_arr in zip(model_names, val_scores):
-        pred = (score_arr >= ensemble.threshold).astype(int)
+        pred = (score_arr >= 0.5).astype(int)  # default threshold for individual models
         results = evaluate(splits.y_val, pred, score_arr)
         print_report(results, title=f"{name} (Validation)")
 
@@ -111,10 +111,17 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     print_report(final_results, title="Q-Ensemble (Test Set)")
     print_classification_report(splits.y_test, ensemble_test_preds, title="Q-Ensemble Classification Report")
 
+    # Per-attack-type breakdown
+    per_type_results = evaluate_per_attack_type(
+        splits.y_test, ensemble_test_preds, splits.attack_types_test,
+        title="Q-Ensemble — Per-Attack-Type Detection Rates",
+    )
+    final_results["per_attack_type"] = per_type_results
+
     # Individual test results
     print("--- Individual Model Test Results ---")
     for name, score_arr in zip(model_names, test_scores):
-        pred = (score_arr >= ensemble.threshold).astype(int)
+        pred = (score_arr >= 0.5).astype(int)
         results = evaluate(splits.y_test, pred, score_arr)
         print_report(results, title=f"{name} (Test)")
 
@@ -161,10 +168,11 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
         json.dump(scaler_params, f, indent=2)
     print(f"  Saved: {models_dir / 'scaler.json'}")
 
-    # Save ensemble config
+    # Save ensemble config (LR coefficients + threshold)
     ensemble_config = ensemble.to_dict()
     ensemble_config["ensemble_result"] = {
-        "weights": ensemble_result.weights,
+        "coefficients": ensemble_result.coefficients,
+        "intercept": ensemble_result.intercept,
         "threshold": ensemble_result.threshold,
         "best_metric_value": ensemble_result.best_metric_value,
         "metric_name": ensemble_result.metric_name,

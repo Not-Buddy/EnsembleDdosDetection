@@ -1,14 +1,14 @@
 """
-Q-Ensemble: Weighted score-level combination of multiple anomaly detectors.
+Q-Ensemble: Learned stacking combiner for multiple anomaly detectors.
 
-Optimizes per-model weights and the decision threshold on a validation set
-to maximize macro-averaged F-beta score (default β=0.5, penalizes false positives).
-
-Uses fully vectorized numpy operations for fast grid search.
+Uses Logistic Regression to learn how to combine scores from N anomaly
+detectors, then tunes the decision threshold to maximize macro-averaged
+F-beta subject to a minimum benign recall constraint.
 """
 
 import numpy as np
 from dataclasses import dataclass
+from sklearn.linear_model import LogisticRegression
 
 from ensemble_ddos_detection.config import QEnsembleConfig
 
@@ -16,76 +16,26 @@ from ensemble_ddos_detection.config import QEnsembleConfig
 @dataclass
 class EnsembleResult:
     """Holds the optimized ensemble parameters."""
-    weights: list[float]       # [w_if, w_ae, w_svm]
+    coefficients: list[float]   # LR coefficients [w_if, w_ae, w_svm]
+    intercept: float
     threshold: float
     best_metric_value: float
     metric_name: str
 
 
-def _vectorized_macro_fbeta(
-    y_true: np.ndarray,
-    preds_matrix: np.ndarray,
-    beta: float = 0.5,
-) -> np.ndarray:
-    """
-    Compute macro-averaged F-beta scores for multiple prediction sets at once.
-
-    Macro average = mean of per-class F-beta, so both benign and attack
-    performance matter equally. β<1 penalizes false positives more
-    (improves benign recall / precision of attack class).
-
-    Args:
-        y_true: (n_samples,) ground truth
-        preds_matrix: (n_samples, n_candidates) binary predictions
-        beta: F-beta parameter (<1 favors precision, >1 favors recall)
-
-    Returns:
-        (n_candidates,) array of macro F-beta scores
-    """
-    positives = y_true.astype(bool)
-    beta_sq = beta ** 2
-
-    # ── Attack class (positive = 1) ────────────────────────────────
-    tp_atk = (preds_matrix & positives[:, None]).sum(axis=0).astype(np.float64)
-    fp_atk = (preds_matrix & ~positives[:, None]).sum(axis=0).astype(np.float64)
-    fn_atk = (~preds_matrix & positives[:, None]).sum(axis=0).astype(np.float64)
-
-    prec_atk = np.divide(tp_atk, tp_atk + fp_atk, out=np.zeros_like(tp_atk), where=(tp_atk + fp_atk) > 0)
-    rec_atk = np.divide(tp_atk, tp_atk + fn_atk, out=np.zeros_like(tp_atk), where=(tp_atk + fn_atk) > 0)
-    denom_atk = beta_sq * prec_atk + rec_atk
-    fb_atk = np.divide((1 + beta_sq) * prec_atk * rec_atk, denom_atk,
-                        out=np.zeros_like(denom_atk), where=denom_atk > 0)
-
-    # ── Benign class (positive = 0, so invert predictions) ─────────
-    tp_ben = (~preds_matrix & ~positives[:, None]).sum(axis=0).astype(np.float64)
-    fp_ben = (~preds_matrix & positives[:, None]).sum(axis=0).astype(np.float64)
-    fn_ben = (preds_matrix & ~positives[:, None]).sum(axis=0).astype(np.float64)
-
-    prec_ben = np.divide(tp_ben, tp_ben + fp_ben, out=np.zeros_like(tp_ben), where=(tp_ben + fp_ben) > 0)
-    rec_ben = np.divide(tp_ben, tp_ben + fn_ben, out=np.zeros_like(tp_ben), where=(tp_ben + fn_ben) > 0)
-    denom_ben = beta_sq * prec_ben + rec_ben
-    fb_ben = np.divide((1 + beta_sq) * prec_ben * rec_ben, denom_ben,
-                        out=np.zeros_like(denom_ben), where=denom_ben > 0)
-
-    # ── Macro average ──────────────────────────────────────────────
-    return (fb_atk + fb_ben) / 2.0
-
-
 class QEnsemble:
     """
-    Q-Ensemble combiner for anomaly detection.
+    Learned Q-Ensemble combiner using Logistic Regression stacking.
 
-    Combines scores from N anomaly detectors via weighted averaging:
-        score_ensemble = Σ(w_i * s_i)  where Σ(w_i) = 1
-
-    Weights and threshold are optimized on a validation set using
-    macro-averaged F-beta to balance both benign and attack performance.
+    Trains a LR on the 3 anomaly scores → binary label, then tunes
+    the threshold on predicted probabilities to maximize macro F-beta
+    subject to a minimum benign recall constraint.
     """
 
     def __init__(self, n_models: int = 3, config: QEnsembleConfig | None = None):
         self.config = config or QEnsembleConfig()
         self.n_models = n_models
-        self.weights: np.ndarray = np.ones(n_models) / n_models  # uniform default
+        self.lr: LogisticRegression | None = None
         self.threshold: float = 0.5
         self._optimized: bool = False
 
@@ -95,115 +45,122 @@ class QEnsemble:
         y_true: np.ndarray,
     ) -> EnsembleResult:
         """
-        Vectorized grid-search over weight simplex and thresholds
-        to maximize macro-averaged F-beta score.
+        Train LR on scores, then tune threshold with benign recall constraint.
 
         Args:
-            scores: List of anomaly score arrays, one per model. Each shape (n_samples,).
-            y_true: Ground truth binary labels (0=benign, 1=attack).
+            scores: List of anomaly score arrays, one per model. Shape (n_samples,).
+            y_true: Binary labels (0=benign, 1=attack).
 
         Returns:
-            EnsembleResult with optimized weights and threshold.
+            EnsembleResult with LR coefficients and optimized threshold.
         """
-        assert len(scores) == self.n_models, (
-            f"Expected {self.n_models} score arrays, got {len(scores)}"
-        )
+        assert len(scores) == self.n_models
 
-        scores_matrix = np.stack(scores, axis=1)  # (n_samples, n_models)
-        steps = self.config.weight_grid_steps
+        X = np.stack(scores, axis=1)  # (n_samples, n_models)
         beta = self.config.beta
         min_benign_recall = self.config.min_benign_recall
 
-        # Pre-compute benign mask for constraint checking
-        benign_mask = ~y_true.astype(bool)  # True where benign
-        n_benign = benign_mask.sum()
-
-        # ── Generate weight candidates on the simplex ──────────────────
-        weight_candidates: list[tuple[float, ...]] = []
-        for i in range(steps + 1):
-            for j in range(steps + 1 - i):
-                k = steps - i - j
-                weight_candidates.append((i / steps, j / steps, k / steps))
-        weights_arr = np.array(weight_candidates)  # (n_weights, n_models)
-
-        # ── Threshold candidates (fine-grained for better benign recall) ──
-        thresholds = np.unique(np.concatenate([
-            np.linspace(0.01, 0.30, 100),   # fine-grained in critical overlap zone
-            np.linspace(0.30, 0.95, 50),     # coarser in the high-confidence zone
-        ]))
-
-        n_candidates = len(weight_candidates)
-        print(
-            f"[Q-Ensemble] Optimizing: {n_candidates} weight combos "
-            f"× {len(thresholds)} thresholds (macro F-beta, β={beta}, "
-            f"min_benign_recall={min_benign_recall})..."
+        # ── 1. Train Logistic Regression ───────────────────────────────
+        print("[Q-Ensemble] Training Logistic Regression stacking combiner...")
+        self.lr = LogisticRegression(
+            max_iter=1000,
+            solver="lbfgs",
+            C=1.0,
+            random_state=42,
         )
+        self.lr.fit(X, y_true)
+
+        coefs = self.lr.coef_[0]
+        intercept = self.lr.intercept_[0]
+        print(f"[Q-Ensemble] LR coefficients: IF={coefs[0]:.4f}, "
+              f"AE={coefs[1]:.4f}, SVM={coefs[2]:.4f}")
+        print(f"[Q-Ensemble] LR intercept: {intercept:.4f}")
+
+        # ── 2. Get predicted probabilities ─────────────────────────────
+        probs = self.lr.predict_proba(X)[:, 1]  # P(attack)
+
+        # ── 3. Threshold tuning with benign recall constraint ──────────
+        thresholds = np.linspace(0.01, 0.99, 200)
+        benign_mask = ~y_true.astype(bool)
+        n_benign = benign_mask.sum()
+        beta_sq = beta ** 2
+
+        print(f"[Q-Ensemble] Tuning threshold (200 candidates, "
+              f"min_benign_recall={min_benign_recall}, β={beta})...")
 
         best_score = -1.0
-        best_weights = self.weights.copy()
-        best_threshold = self.threshold
+        best_threshold = 0.5
 
-        # Process each weight candidate; vectorize across all thresholds
-        for idx, w in enumerate(weights_arr):
-            ensemble_scores = scores_matrix @ w  # (n_samples,)
+        for thr in thresholds:
+            preds = (probs >= thr).astype(int)
 
-            # Broadcast: (n_samples, 1) >= (1, n_thresholds) → (n_samples, n_thresholds)
-            preds = (ensemble_scores[:, None] >= thresholds[None, :])
-
-            # ── Benign recall constraint ───────────────────────────────
-            # Benign recall = fraction of benign correctly predicted as 0 (not flagged)
-            benign_correct = (~preds[benign_mask, :]).sum(axis=0).astype(np.float64)
+            # Check benign recall constraint
+            benign_correct = (preds[benign_mask] == 0).sum()
             benign_recall = benign_correct / max(n_benign, 1)
-            # Mask out thresholds that violate the constraint
-            valid_mask = benign_recall >= min_benign_recall
+            if benign_recall < min_benign_recall:
+                continue
 
-            if not valid_mask.any():
-                continue  # no valid threshold for this weight combo
+            # Compute macro F-beta
+            positives = y_true.astype(bool)
+            # Attack class
+            tp_a = (preds[positives] == 1).sum()
+            fp_a = (preds[~positives] == 1).sum()
+            fn_a = (preds[positives] == 0).sum()
+            p_a = tp_a / max(tp_a + fp_a, 1)
+            r_a = tp_a / max(tp_a + fn_a, 1)
+            d_a = beta_sq * p_a + r_a
+            fb_a = (1 + beta_sq) * p_a * r_a / d_a if d_a > 0 else 0
 
-            metric_vals = _vectorized_macro_fbeta(y_true, preds, beta=beta)
-            # Zero out invalid thresholds
-            metric_vals[~valid_mask] = -1.0
+            # Benign class
+            tp_b = benign_correct
+            fp_b = fn_a  # attacks predicted as benign
+            fn_b = fp_a  # benign predicted as attack
+            p_b = tp_b / max(tp_b + fp_b, 1)
+            r_b = tp_b / max(tp_b + fn_b, 1)
+            d_b = beta_sq * p_b + r_b
+            fb_b = (1 + beta_sq) * p_b * r_b / d_b if d_b > 0 else 0
 
-            best_idx = metric_vals.argmax()
+            macro_fb = (fb_a + fb_b) / 2.0
 
-            if metric_vals[best_idx] > best_score:
-                best_score = metric_vals[best_idx]
-                best_weights = w.copy()
-                best_threshold = float(thresholds[best_idx])
+            if macro_fb > best_score:
+                best_score = macro_fb
+                best_threshold = float(thr)
 
-        self.weights = best_weights
         self.threshold = best_threshold
         self._optimized = True
 
-        print(f"[Q-Ensemble] Optimized weights: IF={self.weights[0]:.3f}, "
-              f"AE={self.weights[1]:.3f}, SVM={self.weights[2]:.3f}")
         print(f"[Q-Ensemble] Optimized threshold: {self.threshold:.4f}")
         print(f"[Q-Ensemble] Best macro F-beta (β={beta}): {best_score:.4f}")
 
         return EnsembleResult(
-            weights=self.weights.tolist(),
+            coefficients=coefs.tolist(),
+            intercept=float(intercept),
             threshold=self.threshold,
             best_metric_value=best_score,
             metric_name=f"macro_fbeta_b{beta}",
         )
 
     def combine_scores(self, scores: list[np.ndarray]) -> np.ndarray:
-        """Compute weighted ensemble score."""
-        scores_matrix = np.stack(scores, axis=1)
-        return scores_matrix @ self.weights
+        """Return LR predicted probability of attack."""
+        assert self.lr is not None, "Must call optimize() first"
+        X = np.stack(scores, axis=1)
+        return self.lr.predict_proba(X)[:, 1]
 
     def predict(self, scores: list[np.ndarray]) -> np.ndarray:
-        """Binary prediction using optimized weights and threshold."""
-        ensemble_scores = self.combine_scores(scores)
-        return (ensemble_scores >= self.threshold).astype(int)
+        """Binary prediction using LR probability and optimized threshold."""
+        probs = self.combine_scores(scores)
+        return (probs >= self.threshold).astype(int)
 
     def to_dict(self) -> dict:
-        """Serialize ensemble config for export."""
+        """Serialize ensemble config for export (Rust inference)."""
+        coefs = self.lr.coef_[0].tolist() if self.lr else [0, 0, 0]
+        intercept = float(self.lr.intercept_[0]) if self.lr else 0.0
         return {
+            "type": "logistic_regression",
             "n_models": self.n_models,
-            "weights": self.weights.tolist(),
+            "coefficients": coefs,
+            "intercept": intercept,
             "threshold": self.threshold,
-            "beta": self.config.beta,
             "model_names": ["isolation_forest", "autoencoder", "one_class_svm"],
             "optimized": self._optimized,
         }
