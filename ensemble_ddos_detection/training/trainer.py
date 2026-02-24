@@ -178,8 +178,8 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     # Save normalization bounds for IF and SVM
     norm_params = {
         "isolation_forest": {
-            "score_min": if_model._score_min,
-            "score_max": if_model._score_max,
+            "p1": if_model._p1,
+            "p99": if_model._p99,
         },
         "autoencoder": {
             "score_min": ae_model._score_min,

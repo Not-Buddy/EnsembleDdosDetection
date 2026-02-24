@@ -40,9 +40,9 @@ TEST_RATIO = 0.15    # mixed: for final evaluation
 
 @dataclass
 class IsolationForestConfig:
-    n_estimators: int = 200
-    max_samples: int | str = "auto"
-    contamination: float = 0.01  # assume ~1% anomalies leak through
+    n_estimators: int = 300
+    max_samples: int = 256       # lower = more aggressive splits, better separation
+    contamination: str = "auto"  # let sklearn pick offset automatically
     random_state: int = 42
     n_jobs: int = -1
 
@@ -79,7 +79,11 @@ class QEnsembleConfig:
     # Weight search grid resolution (steps per dimension)
     weight_grid_steps: int = 20
     # Metric to optimize
-    optimize_metric: str = "f1"
+    optimize_metric: str = "macro_fbeta"
+    # Beta for F-beta: <1 penalizes false positives more
+    beta: float = 0.5
+    # Hard constraint: reject any weight/threshold combo below this benign recall
+    min_benign_recall: float = 0.85
 
 
 @dataclass
