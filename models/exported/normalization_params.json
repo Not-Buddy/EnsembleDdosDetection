@@ -1,0 +1,14 @@
+{
+  "isolation_forest": {
+    "score_min": -0.11511881360885012,
+    "score_max": 0.32685832188728847
+  },
+  "autoencoder": {
+    "score_min": 0.0012447962071746588,
+    "score_max": 2.154564142227173
+  },
+  "one_class_svm": {
+    "score_min": -1.4192009154945944,
+    "score_max": 1.6221545402273372
+  }
+}

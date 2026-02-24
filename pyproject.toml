@@ -1,0 +1,25 @@
+[project]
+name = "ensemble-ddos-detection"
+version = "0.1.0"
+description = "Real-time DDoS mitigation using a Q-Ensemble"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.4.0",
+    "matplotlib>=3.8.0",
+    "tqdm>=4.66.0",
+    "pyarrow>=23.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.0.0",
+    "pytest>=8.0.0"
+]

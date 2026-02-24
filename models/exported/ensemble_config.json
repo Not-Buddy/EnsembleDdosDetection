@@ -1,0 +1,25 @@
+{
+  "n_models": 3,
+  "weights": [
+    0.0,
+    0.95,
+    0.05
+  ],
+  "threshold": 0.05,
+  "model_names": [
+    "isolation_forest",
+    "autoencoder",
+    "one_class_svm"
+  ],
+  "optimized": true,
+  "ensemble_result": {
+    "weights": [
+      0.0,
+      0.95,
+      0.05
+    ],
+    "threshold": 0.05,
+    "best_metric_value": 0.9854444945313056,
+    "metric_name": "f1"
+  }
+}
