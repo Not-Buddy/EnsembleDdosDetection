@@ -5,6 +5,7 @@ Q-Ensemble DDoS Detection — Training Entry Point
 Usage:
     uv run python train.py                 # Train all models
     uv run python train.py --export        # Train + export to ONNX
+    uv run python train.py --export-only   # Export saved models (skip training)
 """
 
 import argparse
@@ -22,6 +23,11 @@ def main() -> int:
         "--export",
         action="store_true",
         help="Export trained models to ONNX after training",
+    )
+    parser.add_argument(
+        "--export-only",
+        action="store_true",
+        help="Skip training, only export existing models to ONNX",
     )
     parser.add_argument(
         "--svm-max-samples",
@@ -49,6 +55,12 @@ def main() -> int:
     config.autoencoder.max_epochs = args.ae_epochs
     config.autoencoder.patience = args.ae_patience
 
+    # ── Export-only mode ──────────────────────────────────────────────
+    if args.export_only:
+        from ensemble_ddos_detection.export.exporter import export_all
+        export_all(config.models_dir)
+        return 0
+
     # ── Train ─────────────────────────────────────────────────────────
     results = train_pipeline(config)
 
@@ -62,3 +74,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

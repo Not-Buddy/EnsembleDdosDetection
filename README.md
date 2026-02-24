@@ -12,7 +12,7 @@ uv sync
 uv run python train.py
 
 # 3. Train + export to ONNX (for Rust inference)
-uv run python train.py --export
+uv run python train.py --export-only
 ```
 
 > **Note:** The dataset must be placed in `Datasets/cicddos2019/` as parquet files.

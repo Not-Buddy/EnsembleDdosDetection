@@ -77,14 +77,29 @@ def _mutual_info_selection(
     feature_names: list[str],
     drop_percentile: float = MI_DROP_PERCENTILE,
     random_state: int = 42,
+    max_samples: int = 50_000,
 ) -> tuple[np.ndarray, list[str], list[str]]:
     """
     Drop features with low mutual information with the target.
 
+    Subsamples to max_samples for speed (MI estimates stabilize well
+    below 50K) and uses all CPU cores.
+
     Returns:
         Filtered X, kept feature names, dropped feature names.
     """
-    mi_scores = mutual_info_classif(X, y, random_state=random_state, n_neighbors=5)
+    # Subsample for speed — MI doesn't need 431K samples
+    rng = np.random.RandomState(random_state)
+    if len(X) > max_samples:
+        idx = rng.choice(len(X), max_samples, replace=False)
+        X_sub, y_sub = X[idx], y[idx]
+        print(f"[Preprocessor] MI: subsampled {max_samples:,} / {len(X):,} for speed")
+    else:
+        X_sub, y_sub = X, y
+
+    mi_scores = mutual_info_classif(
+        X_sub, y_sub, random_state=random_state, n_neighbors=5, n_jobs=-1
+    )
     threshold = np.percentile(mi_scores, drop_percentile)
 
     keep_mask = mi_scores > threshold
@@ -98,6 +113,7 @@ def _mutual_info_selection(
             idx = feature_names.index(name)
             print(f"    Dropped: {name} (MI={mi_scores[idx]:.4f})")
 
+    # Apply mask to full dataset (not the subsample)
     return X[:, keep_mask], kept_names, dropped_names
 
 

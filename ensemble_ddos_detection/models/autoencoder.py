@@ -203,11 +203,15 @@ class AutoencoderModel:
               f"(skip={self.config.use_skip_connections}, scheduler={self.config.scheduler})")
 
         train_ds = TensorDataset(torch.FloatTensor(X_train))
+        use_cuda = self.device.type == "cuda"
         train_loader = DataLoader(
             train_ds,
             batch_size=self.config.batch_size,
             shuffle=True,
             drop_last=False,
+            num_workers=4,
+            pin_memory=use_cuda,
+            persistent_workers=True,
         )
 
         # Benign validation set for early stopping
@@ -307,7 +311,15 @@ class AutoencoderModel:
         """
         self.network.eval()
         dataset = TensorDataset(torch.FloatTensor(X))
-        loader = DataLoader(dataset, batch_size=self.config.batch_size * 2, shuffle=False)
+        use_cuda = self.device.type == "cuda"
+        loader = DataLoader(
+            dataset,
+            batch_size=self.config.batch_size * 2,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=use_cuda,
+            persistent_workers=True,
+        )
         scores_list: list[np.ndarray] = []
 
         alpha = self.config.kl_weight  # same weight as training

@@ -5,7 +5,8 @@
     0.95,
     0.05
   ],
-  "threshold": 0.05,
+  "threshold": 0.24141414141414141,
+  "beta": 0.5,
   "model_names": [
     "isolation_forest",
     "autoencoder",
@@ -18,8 +19,8 @@
       0.95,
       0.05
     ],
-    "threshold": 0.05,
-    "best_metric_value": 0.9863804192472606,
-    "metric_name": "f1"
+    "threshold": 0.24141414141414141,
+    "best_metric_value": 0.9723856469531298,
+    "metric_name": "macro_fbeta_b0.5"
   }
 }
