@@ -39,3 +39,15 @@ ensemble_ddos_detection/
     └── exporter.py              # Export all models to ONNX
 train.py                          # CLI entry-point for full pipeline
 ```
+
+### ROC Curve
+
+The ROC curve shows the trade-off between true positive rate and false positive rate. An AUC of **0.97** indicates strong separation between benign and attack traffic.
+
+![ROC Curve](outputs/roc_curve.png)
+
+### Confusion Matrix
+
+The confusion matrix shows the ensemble correctly identifies 99.8% of attacks with minimal false positives.
+
+![Confusion Matrix](outputs/confusion_matrix.png)

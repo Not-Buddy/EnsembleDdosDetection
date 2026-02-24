@@ -2,10 +2,10 @@
   "n_models": 3,
   "weights": [
     0.0,
-    0.85,
-    0.15
+    0.95,
+    0.05
   ],
-  "threshold": 0.06836734693877551,
+  "threshold": 0.05,
   "model_names": [
     "isolation_forest",
     "autoencoder",
@@ -15,11 +15,11 @@
   "ensemble_result": {
     "weights": [
       0.0,
-      0.85,
-      0.15
+      0.95,
+      0.05
     ],
-    "threshold": 0.06836734693877551,
-    "best_metric_value": 0.9867610527127095,
+    "threshold": 0.05,
+    "best_metric_value": 0.9863804192472606,
     "metric_name": "f1"
   }
 }
