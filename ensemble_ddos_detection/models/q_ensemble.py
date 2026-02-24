@@ -3,11 +3,11 @@ Q-Ensemble: Weighted score-level combination of multiple anomaly detectors.
 
 Optimizes per-model weights and the decision threshold on a validation set
 to maximize a chosen metric (default: F1-score).
+
+Uses fully vectorized numpy operations for fast grid search.
 """
 
 import numpy as np
-from itertools import product
-from sklearn.metrics import f1_score, precision_score, recall_score
 from dataclasses import dataclass
 
 from ensemble_ddos_detection.config import QEnsembleConfig
@@ -20,6 +20,28 @@ class EnsembleResult:
     threshold: float
     best_metric_value: float
     metric_name: str
+
+
+def _vectorized_f1(y_true: np.ndarray, preds_matrix: np.ndarray) -> np.ndarray:
+    """
+    Compute F1 scores for multiple prediction sets at once.
+
+    Args:
+        y_true: (n_samples,) ground truth
+        preds_matrix: (n_samples, n_candidates) binary predictions
+
+    Returns:
+        (n_candidates,) array of F1 scores
+    """
+    positives = y_true.astype(bool)
+    tp = (preds_matrix & positives[:, None]).sum(axis=0).astype(np.float64)
+    fp = (preds_matrix & ~positives[:, None]).sum(axis=0).astype(np.float64)
+    fn = (~preds_matrix & positives[:, None]).sum(axis=0).astype(np.float64)
+    precision = np.divide(tp, tp + fp, out=np.zeros_like(tp), where=(tp + fp) > 0)
+    recall = np.divide(tp, tp + fn, out=np.zeros_like(tp), where=(tp + fn) > 0)
+    denom = precision + recall
+    f1 = np.divide(2 * precision * recall, denom, out=np.zeros_like(denom), where=denom > 0)
+    return f1
 
 
 class QEnsemble:
@@ -45,7 +67,8 @@ class QEnsemble:
         y_true: np.ndarray,
     ) -> EnsembleResult:
         """
-        Grid-search over weight simplex and threshold to maximize the target metric.
+        Vectorized grid-search over weight simplex and thresholds
+        to maximize F1-score (or other metric).
 
         Args:
             scores: List of anomaly score arrays, one per model. Each shape (n_samples,).
@@ -62,46 +85,40 @@ class QEnsemble:
         steps = self.config.weight_grid_steps
 
         # ── Generate weight candidates on the simplex ──────────────────
-        # For 3 models: w1 + w2 + w3 = 1, w_i >= 0
         weight_candidates: list[tuple[float, ...]] = []
         for i in range(steps + 1):
             for j in range(steps + 1 - i):
                 k = steps - i - j
-                w = (i / steps, j / steps, k / steps)
-                weight_candidates.append(w)
+                weight_candidates.append((i / steps, j / steps, k / steps))
+        weights_arr = np.array(weight_candidates)  # (n_weights, n_models)
 
         # ── Threshold candidates ───────────────────────────────────────
-        threshold_candidates = np.linspace(0.05, 0.95, 50)
+        thresholds = np.linspace(0.05, 0.95, 50)
+
+        n_candidates = len(weight_candidates)
+        print(
+            f"[Q-Ensemble] Optimizing: {n_candidates} weight combos "
+            f"× {len(thresholds)} thresholds (vectorized)..."
+        )
 
         best_score = -1.0
         best_weights = self.weights.copy()
         best_threshold = self.threshold
 
-        print(
-            f"[Q-Ensemble] Optimizing weights ({len(weight_candidates)} candidates) "
-            f"× thresholds ({len(threshold_candidates)} candidates)..."
-        )
+        # Process each weight candidate; vectorize across all thresholds
+        for idx, w in enumerate(weights_arr):
+            ensemble_scores = scores_matrix @ w  # (n_samples,)
 
-        for w in weight_candidates:
-            w_arr = np.array(w)
-            ensemble_scores = scores_matrix @ w_arr  # (n_samples,)
+            # Broadcast: (n_samples, 1) >= (1, n_thresholds) → (n_samples, n_thresholds)
+            preds = (ensemble_scores[:, None] >= thresholds[None, :])
 
-            for thr in threshold_candidates:
-                y_pred = (ensemble_scores >= thr).astype(int)
+            f1s = _vectorized_f1(y_true, preds)
+            best_idx = f1s.argmax()
 
-                if self.config.optimize_metric == "f1":
-                    metric_val = f1_score(y_true, y_pred, zero_division=0)
-                elif self.config.optimize_metric == "precision":
-                    metric_val = precision_score(y_true, y_pred, zero_division=0)
-                elif self.config.optimize_metric == "recall":
-                    metric_val = recall_score(y_true, y_pred, zero_division=0)
-                else:
-                    metric_val = f1_score(y_true, y_pred, zero_division=0)
-
-                if metric_val > best_score:
-                    best_score = metric_val
-                    best_weights = w_arr.copy()
-                    best_threshold = float(thr)
+            if f1s[best_idx] > best_score:
+                best_score = f1s[best_idx]
+                best_weights = w.copy()
+                best_threshold = float(thresholds[best_idx])
 
         self.weights = best_weights
         self.threshold = best_threshold

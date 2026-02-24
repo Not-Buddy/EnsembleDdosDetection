@@ -17,7 +17,7 @@ from ensemble_ddos_detection.models.autoencoder import AutoencoderModel, Autoenc
 def export_autoencoder_onnx(
     model_path: Path,
     output_path: Path,
-    opset_version: int = 14,
+    opset_version: int = 17,
 ) -> None:
     """Export PyTorch autoencoder to ONNX."""
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
@@ -33,6 +33,7 @@ def export_autoencoder_onnx(
     network.eval()
 
     dummy_input = torch.randn(1, input_dim)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     torch.onnx.export(
         network,
@@ -47,6 +48,7 @@ def export_autoencoder_onnx(
             "input": {0: "batch_size"},
             "output": {0: "batch_size"},
         },
+        dynamo=False,  # use legacy TorchScript exporter (avoids onnxscript converter bugs)
     )
     print(f"[Export] Autoencoder → {output_path}")
 
@@ -72,8 +74,14 @@ def export_sklearn_onnx(
     sklearn_model = wrapper.sklearn_model
 
     initial_type = [("input", FloatTensorType([None, n_features]))]
-    onnx_model = convert_sklearn(sklearn_model, initial_types=initial_type)
+    # Pin ai.onnx.ml to v3 to avoid skl2onnx "version 4 not supported" error
+    onnx_model = convert_sklearn(
+        sklearn_model,
+        initial_types=initial_type,
+        target_opset={"": 17, "ai.onnx.ml": 3},
+    )
 
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "wb") as f:
         f.write(onnx_model.SerializeToString())
     print(f"[Export] {model_path.stem} → {output_path}")
