@@ -148,12 +148,14 @@ def train_pipeline(config: PipelineConfig | None = None) -> dict:
     }, models_dir / "autoencoder.pt")
     print(f"  Saved: {models_dir / 'autoencoder.pt'}")
 
-    # Save scaler parameters as JSON (for Rust)
+    # Save scaler parameters + feature engineering metadata as JSON (for Rust)
     scaler_params = {
         "mean": splits.scaler.mean_.tolist(),
         "scale": splits.scaler.scale_.tolist(),
         "feature_names": splits.feature_names,
         "n_features": splits.n_features,
+        "log_transformed_columns": splits.log_transformed_columns,
+        "dropped_mi_columns": splits.dropped_mi_columns,
     }
     with open(models_dir / "scaler.json", "w") as f:
         json.dump(scaler_params, f, indent=2)

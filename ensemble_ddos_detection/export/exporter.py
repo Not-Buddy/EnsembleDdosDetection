@@ -8,10 +8,23 @@ import json
 import pickle
 import numpy as np
 import torch
+import torch.nn as nn
 from pathlib import Path
 
 from ensemble_ddos_detection.config import MODELS_DIR
-from ensemble_ddos_detection.models.autoencoder import AutoencoderModel, AutoencoderNetwork
+from ensemble_ddos_detection.models.autoencoder import AutoencoderModel, VAENetwork
+
+
+class _VAEReconstructionWrapper(nn.Module):
+    """Wraps VAE to output only reconstruction (ONNX needs single output)."""
+
+    def __init__(self, vae: VAENetwork):
+        super().__init__()
+        self.vae = vae
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        recon, _, _ = self.vae(x)
+        return recon
 
 
 def export_autoencoder_onnx(
@@ -19,24 +32,29 @@ def export_autoencoder_onnx(
     output_path: Path,
     opset_version: int = 17,
 ) -> None:
-    """Export PyTorch autoencoder to ONNX."""
+    """Export PyTorch VAE to ONNX (reconstruction output only)."""
     checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
     input_dim = checkpoint["input_dim"]
     config = checkpoint["config"]
 
-    network = AutoencoderNetwork(
+    network = VAENetwork(
         input_dim=input_dim,
         hidden_layers=config.hidden_layers,
         dropout=0.0,  # no dropout for inference
+        use_skip=config.use_skip_connections,
     )
     network.load_state_dict(checkpoint["state_dict"])
     network.eval()
+
+    # Wrap to return only reconstruction
+    wrapper = _VAEReconstructionWrapper(network)
+    wrapper.eval()
 
     dummy_input = torch.randn(1, input_dim)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     torch.onnx.export(
-        network,
+        wrapper,
         dummy_input,
         str(output_path),
         export_params=True,
@@ -48,9 +66,9 @@ def export_autoencoder_onnx(
             "input": {0: "batch_size"},
             "output": {0: "batch_size"},
         },
-        dynamo=False,  # use legacy TorchScript exporter (avoids onnxscript converter bugs)
+        dynamo=False,
     )
-    print(f"[Export] Autoencoder → {output_path}")
+    print(f"[Export] VAE → {output_path}")
 
 
 def export_sklearn_onnx(

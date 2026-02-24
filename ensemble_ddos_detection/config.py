@@ -38,6 +38,11 @@ VAL_RATIO = 0.15     # mixed: for threshold & weight tuning
 TEST_RATIO = 0.15    # mixed: for final evaluation
 
 
+# ── Feature engineering ────────────────────────────────────────────────
+SKEW_THRESHOLD = 5.0         # features with |skew| > this get log-transformed
+MI_DROP_PERCENTILE = 10.0    # bottom N% of mutual information features get dropped
+
+
 @dataclass
 class IsolationForestConfig:
     n_estimators: int = 300
@@ -50,19 +55,24 @@ class IsolationForestConfig:
 @dataclass
 class AutoencoderConfig:
     # Architecture
-    hidden_layers: list[int] = field(default_factory=lambda: [48, 24, 12])
+    hidden_layers: list[int] = field(default_factory=lambda: [64, 32, 16])
     dropout: float = 0.1
-    activation: str = "relu"
+    use_skip_connections: bool = True
+
+    # VAE
+    kl_weight: float = 0.1       # max β for KL divergence
+    kl_warmup_epochs: int = 10   # linearly ramp β from 0 to kl_weight
 
     # Training
     learning_rate: float = 1e-3
     batch_size: int = 512
     max_epochs: int = 100
-    patience: int = 10          # early stopping patience
+    patience: int = 10
     weight_decay: float = 1e-5
+    scheduler: str = "cosine"   # "cosine" | "plateau" | "none"
 
     # Device
-    device: str = "auto"       # "auto" | "cpu" | "cuda"
+    device: str = "auto"
 
 
 @dataclass
