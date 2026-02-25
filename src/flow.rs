@@ -197,6 +197,14 @@ impl FlowState {
             protocol: pkt.protocol,
         };
         state.update(pkt);
+        tracing::debug!(
+            "New flow: {}:{} → {}:{} proto={}",
+            state.key.src_ip,
+            state.key.src_port,
+            state.key.dst_ip,
+            state.key.dst_port,
+            state.key.protocol,
+        );
         state
     }
 
@@ -357,6 +365,15 @@ impl FlowTable {
             if let Some((_, state)) = self.flows.remove(&key)
                 && state.total_packets() >= 2
             {
+                tracing::debug!(
+                    "Flow expired: {}:{} → {}:{} ({} pkts, {:.1}s)",
+                    state.key.src_ip,
+                    state.key.src_port,
+                    state.key.dst_ip,
+                    state.key.dst_port,
+                    state.total_packets(),
+                    state.duration_us() / 1_000_000.0,
+                );
                 expired.push(state);
             }
         }

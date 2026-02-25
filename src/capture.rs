@@ -61,9 +61,15 @@ pub fn start_capture(interface: NetworkInterface, tx: mpsc::Sender<PacketInfo>) 
 
     tracing::info!("Capturing on interface: {}", interface.name);
 
+    let mut first_packet = true;
+
     loop {
         match rx.next() {
             Ok(packet_data) => {
+                if first_packet {
+                    tracing::info!("✓ First packet received ({} bytes)", packet_data.len());
+                    first_packet = false;
+                }
                 if let Some(info) = parse_packet(packet_data)
                     && tx.send(info).is_err()
                 {
