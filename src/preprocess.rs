@@ -70,12 +70,12 @@ impl Preprocessor {
         }
 
         // 2. StandardScaler
-        for i in 0..self.n_features {
+        for (i, feat) in features.iter_mut().enumerate().take(self.n_features) {
             let scale = self.scale[i];
             if scale.abs() > 1e-10 {
-                features[i] = (features[i] - self.mean[i]) / scale;
+                *feat = (*feat - self.mean[i]) / scale;
             } else {
-                features[i] = 0.0;
+                *feat = 0.0;
             }
         }
     }

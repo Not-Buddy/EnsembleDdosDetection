@@ -107,7 +107,7 @@ fn main() -> Result<()> {
                 flow_table.process_packet(&pkt);
                 total_packets += 1;
 
-                if total_packets % 10_000 == 0 {
+                if total_packets.is_multiple_of(10_000) {
                     tracing::info!(
                         "Packets: {} | Active flows: {} | Classified: {} | Attacks: {}",
                         total_packets,

@@ -13,6 +13,7 @@ pub struct ScalerConfig {
     pub feature_names: Vec<String>,
     pub n_features: usize,
     pub log_transformed_columns: Vec<String>,
+    #[allow(dead_code)]
     pub dropped_mi_columns: Vec<String>,
 }
 
@@ -47,12 +48,16 @@ pub struct SVMNormParams {
 #[derive(Debug, Deserialize)]
 pub struct EnsembleConfig {
     #[serde(rename = "type")]
+    #[allow(dead_code)]
     pub combiner_type: String,
+    #[allow(dead_code)]
     pub n_models: usize,
     pub coefficients: Vec<f64>,
     pub intercept: f64,
     pub threshold: f64,
+    #[allow(dead_code)]
     pub model_names: Vec<String>,
+    #[allow(dead_code)]
     pub optimized: bool,
 }
 

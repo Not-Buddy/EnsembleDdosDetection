@@ -31,7 +31,6 @@ pub struct PacketInfo {
 }
 
 /// TCP flag bitmasks
-pub const TCP_FIN: u8 = 0x01;
 pub const TCP_SYN: u8 = 0x02;
 pub const TCP_RST: u8 = 0x04;
 pub const TCP_PSH: u8 = 0x08;
@@ -65,11 +64,11 @@ pub fn start_capture(interface: NetworkInterface, tx: mpsc::Sender<PacketInfo>) 
     loop {
         match rx.next() {
             Ok(packet_data) => {
-                if let Some(info) = parse_packet(packet_data) {
-                    if tx.send(info).is_err() {
-                        tracing::warn!("Packet channel closed, stopping capture");
-                        break;
-                    }
+                if let Some(info) = parse_packet(packet_data)
+                    && tx.send(info).is_err()
+                {
+                    tracing::warn!("Packet channel closed, stopping capture");
+                    break;
                 }
             }
             Err(e) => {
@@ -113,7 +112,7 @@ fn parse_ipv4(data: &[u8]) -> Option<PacketInfo> {
                     .saturating_sub(tcp.get_data_offset() as usize * 4)
                     as u32,
                 header_len: tcp.get_data_offset() as u16 * 4,
-                tcp_flags: tcp.get_flags() as u8,
+                tcp_flags: tcp.get_flags(),
                 window_size: tcp.get_window(),
                 timestamp: Instant::now(),
             })

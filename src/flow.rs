@@ -158,7 +158,6 @@ pub struct FlowState {
     pub active_times: RunningStats,
     pub idle_times: RunningStats,
     active_start: Option<Instant>,
-    idle_start: Option<Instant>,
     pub protocol: u8,
 }
 
@@ -195,7 +194,6 @@ impl FlowState {
             active_times: RunningStats::new(),
             idle_times: RunningStats::new(),
             active_start: Some(pkt.timestamp),
-            idle_start: None,
             protocol: pkt.protocol,
         };
         state.update(pkt);
@@ -356,10 +354,10 @@ impl FlowTable {
         }
 
         for key in keys_to_remove {
-            if let Some((_, state)) = self.flows.remove(&key) {
-                if state.total_packets() >= 2 {
-                    expired.push(state);
-                }
+            if let Some((_, state)) = self.flows.remove(&key)
+                && state.total_packets() >= 2
+            {
+                expired.push(state);
             }
         }
 
