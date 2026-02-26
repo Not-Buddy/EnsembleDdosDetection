@@ -77,11 +77,10 @@ fn build_remote_nodes(app: &App) -> Vec<RemoteNode> {
             entry.has_established = true;
         }
 
-        if let Some(ref name) = conn.process_name {
-            if !entry.processes.contains(name) {
+        if let Some(ref name) = conn.process_name
+            && !entry.processes.contains(name) {
                 entry.processes.push(name.clone());
             }
-        }
 
         let proto = conn.protocol.to_uppercase();
         if !entry.protocols.contains(&proto) {
@@ -191,7 +190,7 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
             .map(|r| format!("{:.1}ms", r))
             .unwrap_or_else(|| "—".to_string());
         left_nodes.push((
-            format!("Gateway"),
+            "Gateway".to_string(),
             format!("{}\n{} {}", gw, dot, rtt_str),
             style,
         ));

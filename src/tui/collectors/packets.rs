@@ -104,12 +104,11 @@ pub fn classify_expert(protocol: &str, info: &str, tcp_flags: Option<u8>) -> Exp
     }
 
     // HTTP errors  
-    if protocol == "HTTP" {
-        if info.contains("HTTP/1.1 4") || info.contains("HTTP/1.1 5") ||
-           info.contains("HTTP/1.0 4") || info.contains("HTTP/1.0 5") {
+    if protocol == "HTTP"
+        && (info.contains("HTTP/1.1 4") || info.contains("HTTP/1.1 5") ||
+           info.contains("HTTP/1.0 4") || info.contains("HTTP/1.0 5")) {
             return ExpertSeverity::Warn;
         }
-    }
 
     ExpertSeverity::Chat
 }
@@ -262,6 +261,7 @@ impl StreamTracker {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn track_packet(
         &mut self,
         src_ip: &str,
@@ -308,19 +308,18 @@ impl StreamTracker {
         };
 
         if stream.initiator.is_none() {
-            if let Some(flags) = tcp_flags {
-                if flags & 0x02 != 0 {
+            if let Some(flags) = tcp_flags
+                && flags & 0x02 != 0 {
                     stream.initiator = Some((src_ip.to_string(), src_port));
                 }
-            }
             if stream.initiator.is_none() {
                 stream.initiator = Some((src_ip.to_string(), src_port));
             }
         }
 
         // Track TCP handshake timing
-        if protocol == StreamProtocol::Tcp {
-            if let Some(flags) = tcp_flags {
+        if protocol == StreamProtocol::Tcp
+            && let Some(flags) = tcp_flags {
                 let is_syn = flags & 0x02 != 0;
                 let is_ack = flags & 0x10 != 0;
                 if is_syn && !is_ack {
@@ -334,21 +333,18 @@ impl StreamTracker {
                     }
                 } else if is_syn && is_ack {
                     // SYN-ACK
-                    if let Some(ref mut hs) = stream.handshake {
-                        if hs.syn_ack_ns.is_none() {
+                    if let Some(ref mut hs) = stream.handshake
+                        && hs.syn_ack_ns.is_none() {
                             hs.syn_ack_ns = Some(timestamp_ns);
                         }
-                    }
                 } else if is_ack && !is_syn && stream.packet_count <= 3 {
                     // ACK (completing handshake — only if early in connection)
-                    if let Some(ref mut hs) = stream.handshake {
-                        if hs.syn_ack_ns.is_some() && hs.ack_ns.is_none() {
+                    if let Some(ref mut hs) = stream.handshake
+                        && hs.syn_ack_ns.is_some() && hs.ack_ns.is_none() {
                             hs.ack_ns = Some(timestamp_ns);
                         }
-                    }
                 }
             }
-        }
 
         if is_a_to_b {
             stream.total_bytes_a_to_b += payload.len() as u64;
@@ -477,13 +473,12 @@ impl PacketCollector {
             };
 
             // Apply BPF capture filter if specified
-            if let Some(filter) = bpf.as_deref() {
-                if let Err(e) = cap.filter(filter, true) {
+            if let Some(filter) = bpf.as_deref()
+                && let Err(e) = cap.filter(filter, true) {
                     *error.lock().unwrap() = Some(format!("BPF filter error: {e}"));
                     capturing.store(false, Ordering::SeqCst);
                     return;
                 }
-            }
 
             while capturing.load(Ordering::Relaxed) {
                 match cap.next_packet() {
@@ -722,8 +717,8 @@ fn parse_tcp(
     }
 
     // TLS
-    if !payload.is_empty() {
-        if let Some((tls_info, tls_detail)) = parse_tls(payload) {
+    if !payload.is_empty()
+        && let Some((tls_info, tls_detail)) = parse_tls(payload) {
             details.push(tls_detail);
             let info = format!(
                 "{}:{} → {}:{} {} [{}]",
@@ -731,16 +726,14 @@ fn parse_tcp(
             );
             return ("TLS".into(), Some(src_port), Some(dst_port), info, data_offset, Some(flags));
         }
-    }
 
     // HTTP
-    if !payload.is_empty() {
-        if let Some((http_info, http_detail)) = parse_http(payload) {
+    if !payload.is_empty()
+        && let Some((http_info, http_detail)) = parse_http(payload) {
             details.push(http_detail);
             let info = format!("{}:{} → {}:{} {}", src_ip, src_port, dst_ip, dst_port, http_info);
             return ("HTTP".into(), Some(src_port), Some(dst_port), info, data_offset, Some(flags));
         }
-    }
 
     let payload_len = payload.len();
     let info = format!(
@@ -989,8 +982,8 @@ fn parse_tls(data: &[u8]) -> Option<(String, String)> {
             Some((info, detail))
         }
         11 => Some(("Certificate".into(), format!("TLS: Certificate, Version: {}", version))),
-        14 => Some(("Server Hello Done".into(), format!("TLS: Server Hello Done"))),
-        16 => Some(("Client Key Exchange".into(), format!("TLS: Client Key Exchange"))),
+        14 => Some(("Server Hello Done".into(), "TLS: Server Hello Done".to_string())),
+        16 => Some(("Client Key Exchange".into(), "TLS: Client Key Exchange".to_string())),
         _ => {
             let info = format!("Handshake type {}", handshake_type);
             let detail = format!("TLS: Handshake type {}, Version: {}", handshake_type, version);
@@ -1098,6 +1091,7 @@ fn parse_ntp(data: &[u8]) -> String {
 
 // ── Build packet ────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn build_packet(
     counter: &Arc<Mutex<u64>>,
     protocol: &str,
@@ -1400,7 +1394,8 @@ fn parse_arp(data: &[u8], details: &mut Vec<String>) -> String {
     let target_mac = format_mac(&data[18..24]);
     let target_ip = format!("{}.{}.{}.{}", data[24], data[25], data[26], data[27]);
 
-    let info = match op {
+    
+    match op {
         1 => {
             details.push(format!("ARP: Request — Who has {}? Tell {} ({})", target_ip, sender_ip, sender_mac));
             format!("Who has {}? Tell {}", target_ip, sender_ip)
@@ -1413,8 +1408,7 @@ fn parse_arp(data: &[u8], details: &mut Vec<String>) -> String {
             details.push(format!("ARP: op={}, {} ({}) → {} ({})", op, sender_ip, sender_mac, target_ip, target_mac));
             format!("ARP op={}", op)
         }
-    };
-    info
+    }
 }
 
 // ── PCAP export ─────────────────────────────────────────────
@@ -1551,7 +1545,7 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn parse_or<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
+fn parse_or(tokens: &[String]) -> Option<(FilterExpr, &[String])> {
     let (mut left, mut rest) = parse_and(tokens)?;
     while !rest.is_empty() && rest[0].eq_ignore_ascii_case("or") {
         let (right, r) = parse_and(&rest[1..])?;
@@ -1561,7 +1555,7 @@ fn parse_or<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
     Some((left, rest))
 }
 
-fn parse_and<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
+fn parse_and(tokens: &[String]) -> Option<(FilterExpr, &[String])> {
     let (mut left, mut rest) = parse_not(tokens)?;
     while !rest.is_empty() && rest[0].eq_ignore_ascii_case("and") {
         let (right, r) = parse_not(&rest[1..])?;
@@ -1571,7 +1565,7 @@ fn parse_and<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
     Some((left, rest))
 }
 
-fn parse_not<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
+fn parse_not(tokens: &[String]) -> Option<(FilterExpr, &[String])> {
     if tokens.is_empty() { return None; }
     if tokens[0] == "!" || tokens[0].eq_ignore_ascii_case("not") {
         let (expr, rest) = parse_not(&tokens[1..])?;
@@ -1580,7 +1574,7 @@ fn parse_not<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
     parse_atom(tokens)
 }
 
-fn parse_atom<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
+fn parse_atom(tokens: &[String]) -> Option<(FilterExpr, &[String])> {
     if tokens.is_empty() { return None; }
 
     // ip.src == x
@@ -1593,21 +1587,19 @@ fn parse_atom<'a>(tokens: &'a [String]) -> Option<(FilterExpr, &'a [String])> {
     }
     // port [==] N
     if tokens[0].eq_ignore_ascii_case("port") && tokens.len() >= 2 {
-        if tokens[1] == "==" && tokens.len() >= 3 {
-            if let Ok(p) = tokens[2].parse::<u16>() {
+        if tokens[1] == "==" && tokens.len() >= 3
+            && let Ok(p) = tokens[2].parse::<u16>() {
                 return Some((FilterExpr::Port(p), &tokens[3..]));
             }
-        }
         if let Ok(p) = tokens[1].parse::<u16>() {
             return Some((FilterExpr::Port(p), &tokens[2..]));
         }
     }
     // stream N
-    if tokens[0].eq_ignore_ascii_case("stream") && tokens.len() >= 2 {
-        if let Ok(n) = tokens[1].parse::<u32>() {
+    if tokens[0].eq_ignore_ascii_case("stream") && tokens.len() >= 2
+        && let Ok(n) = tokens[1].parse::<u32>() {
             return Some((FilterExpr::Stream(n), &tokens[2..]));
         }
-    }
     // contains "x"
     if tokens[0].eq_ignore_ascii_case("contains") && tokens.len() >= 2 {
         let val = tokens[1].trim_matches('"').to_lowercase();
@@ -1647,8 +1639,8 @@ pub fn matches_packet(expr: &FilterExpr, pkt: &CapturedPacket) -> bool {
                 || pkt.dst_ip.to_lowercase().contains(s)
                 || pkt.protocol.to_lowercase().contains(s)
                 || pkt.payload_text.to_lowercase().contains(s)
-                || pkt.src_host.as_ref().map_or(false, |h| h.to_lowercase().contains(s))
-                || pkt.dst_host.as_ref().map_or(false, |h| h.to_lowercase().contains(s))
+                || pkt.src_host.as_ref().is_some_and(|h| h.to_lowercase().contains(s))
+                || pkt.dst_host.as_ref().is_some_and(|h| h.to_lowercase().contains(s))
         }
         FilterExpr::Not(inner) => !matches_packet(inner, pkt),
         FilterExpr::And(a, b) => matches_packet(a, pkt) && matches_packet(b, pkt),

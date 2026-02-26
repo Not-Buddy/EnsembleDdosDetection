@@ -171,9 +171,9 @@ fn extract_entity_name(v: &serde_json::Value) -> Option<String> {
     let entities = v.get("entities")?.as_array()?;
     for entity in entities {
         let roles = entity.get("roles").and_then(|r| r.as_array());
-        let is_registrant = roles.map_or(false, |r| {
+        let is_registrant = roles.is_some_and(|r| {
             r.iter().any(|role| {
-                role.as_str().map_or(false, |s| s == "registrant" || s == "administrative")
+                role.as_str().is_some_and(|s| s == "registrant" || s == "administrative")
             })
         });
         if is_registrant {

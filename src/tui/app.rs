@@ -332,11 +332,10 @@ fn build_connection_filter(conn: &Connection) -> String {
         parts.push(ip);
     }
 
-    if let Some(port) = remote_port {
-        if port.parse::<u16>().is_ok() {
+    if let Some(port) = remote_port
+        && port.parse::<u16>().is_ok() {
             parts.push(format!("port {port}"));
         }
-    }
 
     parts.join(" and ")
 }
@@ -525,15 +524,14 @@ pub async fn run<B: Backend>(
                     {
                         if let Some(sel_id) = app.packet_selected {
                             let packets = app.packet_collector.get_packets();
-                            if let Some(pkt) = packets.iter().find(|p| p.id == sel_id) {
-                                if pkt.stream_index.is_some() {
+                            if let Some(pkt) = packets.iter().find(|p| p.id == sel_id)
+                                && pkt.stream_index.is_some() {
                                     app.stream_view_open = true;
                                     app.stream_view_index = pkt.stream_index;
                                     app.stream_scroll = 0;
                                     app.stream_direction_filter = StreamDirectionFilter::Both;
                                     app.stream_hex_mode = false;
                                 }
-                            }
                         }
                     }
                     KeyCode::Char('c') if app.current_tab == Tab::Packets => {
@@ -567,11 +565,10 @@ pub async fn run<B: Backend>(
                     KeyCode::Char('m')
                         if app.current_tab == Tab::Packets && !app.stream_view_open =>
                     {
-                        if let Some(sel_id) = app.packet_selected {
-                            if !app.bookmarks.remove(&sel_id) {
+                        if let Some(sel_id) = app.packet_selected
+                            && !app.bookmarks.remove(&sel_id) {
                                 app.bookmarks.insert(sel_id);
                             }
-                        }
                     }
                     KeyCode::Char('n')
                         if app.current_tab == Tab::Packets && !app.stream_view_open =>
@@ -627,10 +624,10 @@ pub async fn run<B: Backend>(
                                     .collect();
                                 &filtered
                             } else {
-                                &*packets
+                                &packets
                             }
                         } else {
-                            &*packets
+                            &packets
                         };
                         let ts = chrono::Local::now().format("%Y%m%d_%H%M%S");
                         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());

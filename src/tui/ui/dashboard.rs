@@ -371,6 +371,7 @@ fn render_health(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(health, area);
 }
 
+#[allow(dead_code)]
 fn rtt_heatmap_spans(history: &[Option<f64>], width: usize) -> Vec<Span<'static>> {
     if history.is_empty() {
         return vec![Span::styled(
@@ -424,6 +425,7 @@ fn rtt_heatmap_spans(history: &[Option<f64>], width: usize) -> Vec<Span<'static>
         .collect()
 }
 
+#[allow(dead_code)]
 fn render_latency_heatmap(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .title(" Latency Heatmap ")

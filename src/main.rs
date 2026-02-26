@@ -181,7 +181,7 @@ async fn main() -> Result<()> {
                         total_packets += 1;
 
                         // Log stats every 1,000 packets
-                        if total_packets % 1_000 == 0 {
+                        if total_packets.is_multiple_of(1_000) {
                             let elapsed = last_rate_check.elapsed().as_secs_f64();
                             let pkt_delta = total_packets - last_rate_packets;
                             let pps = if elapsed > 0.0 {

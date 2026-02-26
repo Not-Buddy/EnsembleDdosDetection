@@ -83,11 +83,10 @@ fn collect_dns() -> Vec<String> {
     if let Ok(contents) = std::fs::read_to_string("/etc/resolv.conf") {
         for line in contents.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("nameserver ") {
-                if let Some(addr) = trimmed.split_whitespace().nth(1) {
+            if trimmed.starts_with("nameserver ")
+                && let Some(addr) = trimmed.split_whitespace().nth(1) {
                     servers.push(addr.to_string());
                 }
-            }
         }
     }
 

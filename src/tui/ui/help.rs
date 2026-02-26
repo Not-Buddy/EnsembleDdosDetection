@@ -70,116 +70,102 @@ fn key_line(key: &str, desc: &str) -> Line<'static> {
 }
 
 fn build_help_lines() -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-
-    // GLOBAL KEYS
-    lines.push(section_header("GLOBAL KEYS"));
-    lines.push(key_line("q", "Quit"));
-    lines.push(key_line("Ctrl+C", "Quit"));
-    lines.push(key_line("1-8", "Switch tab (Dash/Conn/Iface/Pkt/Stats/Topo/Time/Insights)"));
-    lines.push(key_line("p", "Pause/resume data collection"));
-    lines.push(key_line("r", "Force refresh all data"));
-    lines.push(key_line("a", "Request AI analysis (from any tab)"));
-    lines.push(key_line("?", "Toggle this help overlay"));
-    lines.push(key_line("g", "Toggle GeoIP location display"));
-    lines.push(Line::raw(""));
-
-    // DASHBOARD
-    lines.push(section_header("DASHBOARD (Tab 1)"));
-    lines.push(key_line("↑↓", "Select interface"));
-    lines.push(Line::raw(""));
-
-    // CONNECTIONS
-    lines.push(section_header("CONNECTIONS (Tab 2)"));
-    lines.push(key_line("↑↓", "Scroll connection list"));
-    lines.push(key_line("s", "Cycle sort column"));
-    lines.push(key_line("Enter", "Jump to Packets tab with filter for selected connection"));
-    lines.push(key_line("W (shift)", "Whois lookup for selected connection's remote IP"));
-    lines.push(Line::raw(""));
-
-    // INTERFACES
-    lines.push(section_header("INTERFACES (Tab 3)"));
-    lines.push(key_line("↑↓", "Select interface"));
-    lines.push(Line::raw(""));
-
-    // PACKETS
-    lines.push(section_header("PACKETS (Tab 4)"));
-    lines.push(key_line("↑↓", "Scroll packet list"));
-    lines.push(key_line("Enter", "Select packet at cursor"));
-    lines.push(key_line("c", "Start/stop capture"));
-    lines.push(key_line("i", "Cycle capture interface (when stopped)"));
-    lines.push(key_line("b", "Set BPF capture filter (when stopped)"));
-    lines.push(key_line("/", "Open display filter bar"));
-    lines.push(key_line("Esc", "Clear display filter"));
-    lines.push(key_line("s", "Open stream view for selected packet"));
-    lines.push(key_line("w", "Export packets to .pcap file"));
-    lines.push(key_line("f", "Toggle auto-follow"));
-    lines.push(key_line("x", "Clear all captured packets"));
-    lines.push(key_line("m", "Toggle bookmark on selected packet"));
-    lines.push(key_line("n", "Jump to next bookmarked packet"));
-    lines.push(key_line("N (shift)", "Jump to previous bookmarked packet"));
-    lines.push(key_line("W (shift)", "Whois lookup for selected packet IPs"));
-    lines.push(Line::raw(""));
-
-    // STREAM VIEW
-    lines.push(section_header("STREAM VIEW (in Packets tab)"));
-    lines.push(key_line("Esc", "Close stream view"));
-    lines.push(key_line("↑↓", "Scroll stream content"));
-    lines.push(key_line("→←", "Filter direction (A→B / B→A)"));
-    lines.push(key_line("a", "Show both directions"));
-    lines.push(key_line("h", "Toggle hex/text mode"));
-    lines.push(Line::raw(""));
-
-    // STATS
-    lines.push(section_header("STATS (Tab 5)"));
-    lines.push(key_line("↑↓", "Scroll protocol list"));
-    lines.push(Line::raw(""));
-
-    // TOPOLOGY
-    lines.push(section_header("TOPOLOGY (Tab 6)"));
-    lines.push(key_line("↑↓", "Scroll topology view"));
-    lines.push(key_line("Enter", "Jump to Connections tab"));
-    lines.push(Line::raw(""));
-
-    // TIMELINE
-    lines.push(section_header("TIMELINE (Tab 7)"));
-    lines.push(key_line("↑↓", "Scroll connection list"));
-    lines.push(key_line("t", "Cycle time window (30s/1m/5m/15m/1h)"));
-    lines.push(key_line("Enter", "Jump to Connections tab"));
-    lines.push(Line::raw(""));
-
-    // INSIGHTS
-    lines.push(section_header("INSIGHTS (Tab 8)"));
-    lines.push(key_line("a", "Trigger on-demand AI analysis"));
-    lines.push(key_line("↑↓", "Scroll insights"));
-    lines.push(Line::raw(""));
-
-    // DISPLAY FILTER SYNTAX
-    lines.push(section_header("DISPLAY FILTER SYNTAX"));
-    lines.push(key_line("tcp, udp, dns, icmp, arp", "Filter by protocol"));
-    lines.push(key_line("192.168.1.1", "Match source or destination IP"));
-    lines.push(key_line("ip.src == X / ip.dst == X", "Match specific direction"));
-    lines.push(key_line("port 443", "Match source or destination port"));
-    lines.push(key_line("stream 7", "Match stream index"));
-    lines.push(key_line("contains \"text\"", "Search in info/payload"));
-    lines.push(key_line("and, or, not / !", "Combine filters"));
-    lines.push(key_line("bare word", "Shorthand for contains"));
-    lines.push(Line::raw(""));
-
-    // TCP HANDSHAKE TIMING
-    lines.push(section_header("TCP HANDSHAKE TIMING"));
-    lines.push(key_line("⏱ in stream header", "Total 3-way handshake time (SYN→ACK)"));
-    lines.push(key_line("SYN→SA", "Client→Server network RTT (SYN to SYN-ACK)"));
-    lines.push(key_line("SA→ACK", "Server→Client network RTT (SYN-ACK to ACK)"));
-    lines.push(key_line("Shown in:", "Stream view header, status bar, packet detail"));
-    lines.push(Line::raw(""));
-
-    // EXPERT INFO INDICATORS
-    lines.push(section_header("EXPERT INFO INDICATORS"));
-    lines.push(key_line("● (red)", "Error: TCP RST, DNS NXDOMAIN/SERVFAIL"));
-    lines.push(key_line("▲ (yellow)", "Warning: Zero window, ICMP unreachable, HTTP 4xx/5xx"));
-    lines.push(key_line("· (cyan)", "Note: TCP FIN, DNS response, TLS Server Hello"));
-    lines.push(key_line("(space)", "Chat: SYN, DNS query, ARP, normal traffic"));
-
-    lines
+    vec![
+        // GLOBAL KEYS
+        section_header("GLOBAL KEYS"),
+        key_line("q", "Quit"),
+        key_line("Ctrl+C", "Quit"),
+        key_line("1-8", "Switch tab (Dash/Conn/Iface/Pkt/Stats/Topo/Time/Insights)"),
+        key_line("p", "Pause/resume data collection"),
+        key_line("r", "Force refresh all data"),
+        key_line("a", "Request AI analysis (from any tab)"),
+        key_line("?", "Toggle this help overlay"),
+        key_line("g", "Toggle GeoIP location display"),
+        Line::raw(""),
+        // DASHBOARD
+        section_header("DASHBOARD (Tab 1)"),
+        key_line("↑↓", "Select interface"),
+        Line::raw(""),
+        // CONNECTIONS
+        section_header("CONNECTIONS (Tab 2)"),
+        key_line("↑↓", "Scroll connection list"),
+        key_line("s", "Cycle sort column"),
+        key_line("Enter", "Jump to Packets tab with filter for selected connection"),
+        key_line("W (shift)", "Whois lookup for selected connection's remote IP"),
+        Line::raw(""),
+        // INTERFACES
+        section_header("INTERFACES (Tab 3)"),
+        key_line("↑↓", "Select interface"),
+        Line::raw(""),
+        // PACKETS
+        section_header("PACKETS (Tab 4)"),
+        key_line("↑↓", "Scroll packet list"),
+        key_line("Enter", "Select packet at cursor"),
+        key_line("c", "Start/stop capture"),
+        key_line("i", "Cycle capture interface (when stopped)"),
+        key_line("b", "Set BPF capture filter (when stopped)"),
+        key_line("/", "Open display filter bar"),
+        key_line("Esc", "Clear display filter"),
+        key_line("s", "Open stream view for selected packet"),
+        key_line("w", "Export packets to .pcap file"),
+        key_line("f", "Toggle auto-follow"),
+        key_line("x", "Clear all captured packets"),
+        key_line("m", "Toggle bookmark on selected packet"),
+        key_line("n", "Jump to next bookmarked packet"),
+        key_line("N (shift)", "Jump to previous bookmarked packet"),
+        key_line("W (shift)", "Whois lookup for selected packet IPs"),
+        Line::raw(""),
+        // STREAM VIEW
+        section_header("STREAM VIEW (in Packets tab)"),
+        key_line("Esc", "Close stream view"),
+        key_line("↑↓", "Scroll stream content"),
+        key_line("→←", "Filter direction (A→B / B→A)"),
+        key_line("a", "Show both directions"),
+        key_line("h", "Toggle hex/text mode"),
+        Line::raw(""),
+        // STATS
+        section_header("STATS (Tab 5)"),
+        key_line("↑↓", "Scroll protocol list"),
+        Line::raw(""),
+        // TOPOLOGY
+        section_header("TOPOLOGY (Tab 6)"),
+        key_line("↑↓", "Scroll topology view"),
+        key_line("Enter", "Jump to Connections tab"),
+        Line::raw(""),
+        // TIMELINE
+        section_header("TIMELINE (Tab 7)"),
+        key_line("↑↓", "Scroll connection list"),
+        key_line("t", "Cycle time window (30s/1m/5m/15m/1h)"),
+        key_line("Enter", "Jump to Connections tab"),
+        Line::raw(""),
+        // INSIGHTS
+        section_header("INSIGHTS (Tab 8)"),
+        key_line("a", "Trigger on-demand AI analysis"),
+        key_line("↑↓", "Scroll insights"),
+        Line::raw(""),
+        // DISPLAY FILTER SYNTAX
+        section_header("DISPLAY FILTER SYNTAX"),
+        key_line("tcp, udp, dns, icmp, arp", "Filter by protocol"),
+        key_line("192.168.1.1", "Match source or destination IP"),
+        key_line("ip.src == X / ip.dst == X", "Match specific direction"),
+        key_line("port 443", "Match source or destination port"),
+        key_line("stream 7", "Match stream index"),
+        key_line("contains \"text\"", "Search in info/payload"),
+        key_line("and, or, not / !", "Combine filters"),
+        key_line("bare word", "Shorthand for contains"),
+        Line::raw(""),
+        // TCP HANDSHAKE TIMING
+        section_header("TCP HANDSHAKE TIMING"),
+        key_line("⏱ in stream header", "Total 3-way handshake time (SYN→ACK)"),
+        key_line("SYN→SA", "Client→Server network RTT (SYN to SYN-ACK)"),
+        key_line("SA→ACK", "Server→Client network RTT (SYN-ACK to ACK)"),
+        key_line("Shown in:", "Stream view header, status bar, packet detail"),
+        Line::raw(""),
+        // EXPERT INFO INDICATORS
+        section_header("EXPERT INFO INDICATORS"),
+        key_line("● (red)", "Error: TCP RST, DNS NXDOMAIN/SERVFAIL"),
+        key_line("▲ (yellow)", "Warning: Zero window, ICMP unreachable, HTTP 4xx/5xx"),
+        key_line("· (cyan)", "Note: TCP FIN, DNS response, TLS Server Hello"),
+        key_line("(space)", "Chat: SYN, DNS query, ARP, normal traffic"),
+    ]
 }

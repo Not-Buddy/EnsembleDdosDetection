@@ -64,13 +64,11 @@ impl NetworkSnapshot {
                 *dst_counts.entry(pkt.dst_ip.clone()).or_insert(0) += 1;
             }
 
-            if pkt.protocol == "DNS" && pkt.info.contains("Standard query") && !pkt.info.contains("response") {
-                if let Some(domain) = pkt.info.split_whitespace().last() {
-                    if !dns_queries.contains(&domain.to_string()) && dns_queries.len() < 20 {
+            if pkt.protocol == "DNS" && pkt.info.contains("Standard query") && !pkt.info.contains("response")
+                && let Some(domain) = pkt.info.split_whitespace().last()
+                    && !dns_queries.contains(&domain.to_string()) && dns_queries.len() < 20 {
                         dns_queries.push(domain.to_string());
                     }
-                }
-            }
 
             match pkt.expert {
                 ExpertSeverity::Error => {

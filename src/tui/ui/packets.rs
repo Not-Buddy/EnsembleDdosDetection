@@ -100,7 +100,7 @@ fn render_packet_list(f: &mut Frame, app: &App, packets: &[CapturedPacket], area
     // Apply display filter
     let filter_text = app.packet_filter_active.as_deref()
         .or(if app.packet_filter_input { Some(app.packet_filter_text.as_str()) } else { None });
-    let filter_expr = filter_text.and_then(|t| parse_filter(t));
+    let filter_expr = filter_text.and_then(parse_filter);
 
     let filtered: Vec<&CapturedPacket> = if let Some(ref expr) = filter_expr {
         packets.iter().filter(|p| matches_packet(expr, p)).collect()
@@ -311,9 +311,9 @@ fn render_detail(f: &mut Frame, app: &App, packets: &[CapturedPacket], area: Rec
             detail_lines.extend(whois_lines);
 
             // TCP handshake timing (if this packet belongs to a stream with handshake data)
-            if let Some(stream_idx) = pkt.stream_index {
-                if let Some(stream) = app.packet_collector.get_stream(stream_idx) {
-                    if let Some(ref hs) = stream.handshake {
+            if let Some(stream_idx) = pkt.stream_index
+                && let Some(stream) = app.packet_collector.get_stream(stream_idx)
+                    && let Some(ref hs) = stream.handshake {
                         let mut hs_parts = Vec::new();
                         if let Some(syn_sa) = hs.syn_to_syn_ack_ms() {
                             hs_parts.push(format!("SYN→SYN-ACK: {:.2}ms", syn_sa));
@@ -331,8 +331,6 @@ fn render_detail(f: &mut Frame, app: &App, packets: &[CapturedPacket], area: Rec
                             )));
                         }
                     }
-                }
-            }
 
             let proto_detail = Paragraph::new(detail_lines)
                 .block(

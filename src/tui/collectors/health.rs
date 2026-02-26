@@ -90,29 +90,26 @@ fn parse_loss(output: &str) -> f64 {
     for line in output.lines() {
         if line.contains("packet loss") || line.contains("% loss") {
             for part in line.split_whitespace() {
-                if part.ends_with('%') {
-                    if let Ok(val) = part.trim_end_matches('%').parse::<f64>() {
+                if part.ends_with('%')
+                    && let Ok(val) = part.trim_end_matches('%').parse::<f64>() {
                         return val;
                     }
-                }
             }
             // Try comma-separated format
             for segment in line.split(',') {
                 let trimmed = segment.trim();
-                if trimmed.contains("% packet loss") || trimmed.contains("% loss") {
-                    if let Some(pct_str) = trimmed.split('%').next() {
+                if (trimmed.contains("% packet loss") || trimmed.contains("% loss"))
+                    && let Some(pct_str) = trimmed.split('%').next() {
                         let pct_str = pct_str.trim();
                         if let Ok(val) = pct_str.parse::<f64>() {
                             return val;
                         }
                         // Handle "0.0% packet loss" - get last word before %
-                        if let Some(last_word) = pct_str.split_whitespace().last() {
-                            if let Ok(val) = last_word.parse::<f64>() {
+                        if let Some(last_word) = pct_str.split_whitespace().last()
+                            && let Ok(val) = last_word.parse::<f64>() {
                                 return val;
                             }
-                        }
                     }
-                }
             }
         }
     }
@@ -122,24 +119,22 @@ fn parse_loss(output: &str) -> f64 {
 fn parse_avg_rtt(output: &str) -> Option<f64> {
     // "round-trip min/avg/max/stddev = 1.234/2.345/3.456/0.567 ms"
     for line in output.lines() {
-        if line.contains("min/avg/max") || line.contains("rtt min/avg/max") {
-            if let Some(stats) = line.split('=').nth(1) {
+        if (line.contains("min/avg/max") || line.contains("rtt min/avg/max"))
+            && let Some(stats) = line.split('=').nth(1) {
                 let stats = stats.trim();
                 let parts: Vec<&str> = stats.split('/').collect();
                 if parts.len() >= 2 {
                     return parts[1].trim().parse().ok();
                 }
             }
-        }
     }
     // Windows format: "Minimum = 1ms, Maximum = 3ms, Average = 2ms"
     for line in output.lines() {
-        if line.contains("Average =") {
-            if let Some(avg_part) = line.split("Average =").nth(1) {
+        if line.contains("Average =")
+            && let Some(avg_part) = line.split("Average =").nth(1) {
                 let avg_str = avg_part.trim().trim_end_matches("ms").trim();
                 return avg_str.parse().ok();
             }
-        }
     }
     None
 }
