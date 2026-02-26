@@ -10,6 +10,7 @@ mod features;
 mod flow;
 mod inference;
 mod preprocess;
+mod tui;
 
 #[cfg(test)]
 mod test;
@@ -62,14 +63,21 @@ fn proto_name(proto: u8) -> &'static str {
     }
 }
 
-fn main() -> Result<()> {
-    // Initialize tracing with elapsed-time formatting
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Set up file logging so stdout is free for the TUI
+    std::fs::create_dir_all("logs").ok();
+    let file_appender = tracing_appender::rolling::never("logs", "ddos.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
     tracing_subscriber::fmt()
+        .with_writer(non_blocking)
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("ensemble_ddos_detection=info".parse()?),
         )
         .with_timer(tracing_subscriber::fmt::time::uptime())
+        .with_ansi(false)
         .init();
 
     let cli = Cli::parse();
@@ -135,7 +143,7 @@ fn main() -> Result<()> {
     // ── Start capture thread ──────────────────────────────────────────
     let iface = capture::find_interface(&cli.interface)?;
     let iface_name = iface.name.clone();
-    let capture_handle = std::thread::Builder::new()
+    let _capture_handle = std::thread::Builder::new()
         .name("packet-capture".into())
         .spawn(move || {
             if let Err(e) = capture::start_capture(iface, pkt_tx) {
@@ -148,135 +156,204 @@ fn main() -> Result<()> {
         iface_name
     );
 
-    // ── Main loop ─────────────────────────────────────────────────────
-    let start_time = Instant::now();
-    let sweep_interval = Duration::from_secs(cli.sweep_interval);
-    let mut last_sweep = Instant::now();
-    let mut last_rate_check = Instant::now();
-    let mut total_packets: u64 = 0;
-    let mut last_rate_packets: u64 = 0;
-    let mut total_flows_classified: u64 = 0;
-    let mut total_attacks: u64 = 0;
+    // ── Shared ML Logs Queue ───────────────────────────────────────
+    let ml_logs = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let ml_logs_worker = std::sync::Arc::clone(&ml_logs);
 
-    loop {
-        // Process incoming packets (with timeout so we can sweep)
-        match pkt_rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(pkt) => {
-                flow_table.process_packet(&pkt);
-                total_packets += 1;
+    // ── Start ML inference loop in background ──────────────────────────
+    std::thread::Builder::new()
+        .name("ml-inference".into())
+        .spawn(move || {
+            let start_time = Instant::now();
+            let sweep_interval = Duration::from_secs(cli.sweep_interval);
+            let mut last_sweep = Instant::now();
+            let mut last_rate_check = Instant::now();
+            let mut total_packets: u64 = 0;
+            let mut last_rate_packets: u64 = 0;
+            let mut total_flows_classified: u64 = 0;
+            let mut total_attacks: u64 = 0;
 
-                // Log stats every 1,000 packets
-                if total_packets.is_multiple_of(1_000) {
-                    let elapsed = last_rate_check.elapsed().as_secs_f64();
-                    let pkt_delta = total_packets - last_rate_packets;
-                    let pps = if elapsed > 0.0 {
-                        pkt_delta as f64 / elapsed
-                    } else {
-                        0.0
-                    };
+            loop {
+                // Process incoming packets (with timeout so we can sweep)
+                match pkt_rx.recv_timeout(Duration::from_millis(100)) {
+                    Ok(pkt) => {
+                        flow_table.process_packet(&pkt);
+                        total_packets += 1;
 
-                    tracing::info!(
-                        "[{}] 📦 {} pkts ({:.0}/s) | {} active flows | {} classified | {} attacks",
-                        format_elapsed(start_time),
-                        total_packets,
-                        pps,
-                        flow_table.active_flow_count(),
-                        total_flows_classified,
-                        total_attacks,
-                    );
+                        // Log stats every 1,000 packets
+                        if total_packets % 1_000 == 0 {
+                            let elapsed = last_rate_check.elapsed().as_secs_f64();
+                            let pkt_delta = total_packets - last_rate_packets;
+                            let pps = if elapsed > 0.0 {
+                                pkt_delta as f64 / elapsed
+                            } else {
+                                0.0
+                            };
 
-                    last_rate_check = Instant::now();
-                    last_rate_packets = total_packets;
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                tracing::warn!("Capture channel disconnected");
-                break;
-            }
-        }
-
-        // ── Periodic sweep ────────────────────────────────────────────
-        if last_sweep.elapsed() >= sweep_interval {
-            let expired_flows = flow_table.sweep_expired();
-            let mut sweep_attacks = 0u64;
-            let mut sweep_benign = 0u64;
-
-            for flow_state in &expired_flows {
-                // Extract features
-                let mut flow_features = features::extract_features(flow_state);
-
-                // Preprocess
-                preprocessor.transform(&mut flow_features);
-
-                // Inference
-                match engine.predict(&flow_features) {
-                    Ok(result) => {
-                        total_flows_classified += 1;
-
-                        if result.is_attack {
-                            total_attacks += 1;
-                            sweep_attacks += 1;
-                            tracing::warn!(
-                                "[{}] 🚨 ATTACK  {}:{} → {}:{} {} | {} pkts | prob={:.3} | IF={:.3} AE={:.3} SVM={:.3}",
+                            let stats_msg = format!(
+                                "[{}] 📦 {} pkts ({:.0}/s) | {} active flows | {} classified | {} attacks",
                                 format_elapsed(start_time),
-                                flow_state.key.src_ip,
-                                flow_state.key.src_port,
-                                flow_state.key.dst_ip,
-                                flow_state.key.dst_port,
-                                proto_name(flow_state.key.protocol),
-                                flow_state.total_packets(),
-                                result.combined_prob,
-                                result.if_score,
-                                result.ae_score,
-                                result.svm_score,
+                                total_packets,
+                                pps,
+                                flow_table.active_flow_count(),
+                                total_flows_classified,
+                                total_attacks,
                             );
-                        } else {
-                            sweep_benign += 1;
-                            tracing::info!(
-                                "[{}] ✅ BENIGN  {}:{} → {}:{} {} | {} pkts | prob={:.3} | IF={:.3} AE={:.3} SVM={:.3}",
-                                format_elapsed(start_time),
-                                flow_state.key.src_ip,
-                                flow_state.key.src_port,
-                                flow_state.key.dst_ip,
-                                flow_state.key.dst_port,
-                                proto_name(flow_state.key.protocol),
-                                flow_state.total_packets(),
-                                result.combined_prob,
-                                result.if_score,
-                                result.ae_score,
-                                result.svm_score,
-                            );
+
+                            if let Ok(mut logs) = ml_logs_worker.lock() {
+                                logs.push(stats_msg.clone());
+                                if logs.len() > 1000 {
+                                    logs.remove(0);
+                                }
+                            }
+
+                            tracing::info!("{}", stats_msg);
+
+                            last_rate_check = Instant::now();
+                            last_rate_packets = total_packets;
                         }
                     }
-                    Err(e) => {
-                        tracing::error!(
-                            "Inference error for flow {}:{} → {}:{}: {}",
-                            flow_state.key.src_ip,
-                            flow_state.key.src_port,
-                            flow_state.key.dst_ip,
-                            flow_state.key.dst_port,
-                            e,
-                        );
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        tracing::warn!("Capture channel disconnected");
+                        break;
                     }
                 }
-            }
 
-            // Sweep summary
-            if !expired_flows.is_empty() {
-                tracing::info!(
-                    "[{}] ── Sweep: {} flows expired, {} benign, {} attacks ──",
-                    format_elapsed(start_time),
-                    expired_flows.len(),
-                    sweep_benign,
-                    sweep_attacks,
-                );
-            }
+                // ── Periodic sweep ────────────────────────────────────────────
+                if last_sweep.elapsed() >= sweep_interval {
+                    let expired_flows = flow_table.sweep_expired();
+                    let mut sweep_attacks = 0u64;
+                    let mut sweep_benign = 0u64;
 
-            last_sweep = Instant::now();
-        }
+                    for flow_state in &expired_flows {
+                        // Extract features
+                        let mut flow_features = features::extract_features(flow_state);
+
+                        // Preprocess
+                        preprocessor.transform(&mut flow_features);
+
+                        // Inference
+                        match engine.predict(&flow_features) {
+                            Ok(result) => {
+                                total_flows_classified += 1;
+
+                                if result.is_attack {
+                                    total_attacks += 1;
+                                    sweep_attacks += 1;
+                                    let alert_msg = format!(
+                                    "[{}] 🚨 ATTACK  {}:{} → {}:{} {} | prob={:.3}",
+                                    format_elapsed(start_time),
+                                    flow_state.key.src_ip,
+                                    flow_state.key.src_port,
+                                    flow_state.key.dst_ip,
+                                    flow_state.key.dst_port,
+                                    proto_name(flow_state.key.protocol),
+                                    result.combined_prob,
+                                );
+                                
+                                if let Ok(mut alerts) = ml_logs_worker.lock() {
+                                    alerts.push(alert_msg);
+                                    if alerts.len() > 1000 {
+                                        alerts.remove(0); // keep last 1000 alerts
+                                    }
+                                }
+
+                                tracing::warn!(
+                                        "[{}] 🚨 ATTACK  {}:{} → {}:{} {} | {} pkts | prob={:.3} | IF={:.3} AE={:.3} SVM={:.3}",
+                                        format_elapsed(start_time),
+                                        flow_state.key.src_ip,
+                                        flow_state.key.src_port,
+                                        flow_state.key.dst_ip,
+                                        flow_state.key.dst_port,
+                                        proto_name(flow_state.key.protocol),
+                                        flow_state.total_packets(),
+                                        result.combined_prob,
+                                        result.if_score,
+                                        result.ae_score,
+                                        result.svm_score,
+                                    );
+                                } else {
+                                    sweep_benign += 1;
+                                    tracing::info!(
+                                        "[{}] ✅ BENIGN  {}:{} → {}:{} {} | {} pkts | prob={:.3} | IF={:.3} AE={:.3} SVM={:.3}",
+                                        format_elapsed(start_time),
+                                        flow_state.key.src_ip,
+                                        flow_state.key.src_port,
+                                        flow_state.key.dst_ip,
+                                        flow_state.key.dst_port,
+                                        proto_name(flow_state.key.protocol),
+                                        flow_state.total_packets(),
+                                        result.combined_prob,
+                                        result.if_score,
+                                        result.ae_score,
+                                        result.svm_score,
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    "Inference error for flow {}:{} → {}:{}: {}",
+                                    flow_state.key.src_ip,
+                                    flow_state.key.src_port,
+                                    flow_state.key.dst_ip,
+                                    flow_state.key.dst_port,
+                                    e,
+                                );
+                            }
+                        }
+                    }
+
+                    // Sweep summary
+                    if !expired_flows.is_empty() {
+                        let sweep_msg = format!(
+                            "[{}] ── Sweep: {} flows expired, {} benign, {} attacks ──",
+                            format_elapsed(start_time),
+                            expired_flows.len(),
+                            sweep_benign,
+                            sweep_attacks,
+                        );
+
+                        if let Ok(mut logs) = ml_logs_worker.lock() {
+                            logs.push(sweep_msg.clone());
+                            if logs.len() > 1000 {
+                                logs.remove(0);
+                            }
+                        }
+
+                        tracing::info!("{}", sweep_msg);
+                    }
+
+                    last_sweep = Instant::now();
+                }
+            }
+        }).expect("Failed to start ML inference thread");
+
+    // ── Run TUI ───────────────────────────────────────────────────────
+    crossterm::terminal::enable_raw_mode()?;
+    let mut stdout = std::io::stdout();
+    crossterm::execute!(
+        stdout,
+        crossterm::terminal::EnterAlternateScreen,
+        crossterm::event::EnableMouseCapture
+    )?;
+
+    let backend = ratatui::backend::CrosstermBackend::new(stdout);
+    let mut terminal = ratatui::Terminal::new(backend)?;
+
+    let result = tui::app::run(&mut terminal, ml_logs).await;
+
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(
+        terminal.backend_mut(),
+        crossterm::terminal::LeaveAlternateScreen,
+        crossterm::event::DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(e) = result {
+        eprintln!("Error running TUI: {:?}", e);
     }
 
-    capture_handle.join().ok();
     Ok(())
 }

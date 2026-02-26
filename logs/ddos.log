@@ -1,0 +1,17 @@
+   0.000132669s  INFO ensemble_ddos_detection: Loading configuration...
+   0.000219041s  INFO ensemble_ddos_detection::config: Loaded configs: 54 features, 3 models
+   0.000240631s  INFO ensemble_ddos_detection::preprocess: Preprocessor: 54 features, 34 log-transformed
+   0.000246212s  INFO ensemble_ddos_detection:   Features    : 54 (42 log-transformed)
+   0.000247434s  INFO ensemble_ddos_detection:   LR coefs    : [-1.45, 14.21, 1.49]
+   0.000250199s  INFO ensemble_ddos_detection:   Threshold   : 0.325 | Intercept: -3.366
+   0.000251612s  INFO ensemble_ddos_detection::inference: Loading ONNX models from models/exported/onnx/
+   6.940683398s  INFO ensemble_ddos_detection::inference: All 3 ONNX models loaded successfully
+   6.940798044s  INFO ensemble_ddos_detection: ─────────────────────────────────────────────────
+   6.940801230s  INFO ensemble_ddos_detection:   Interface   : enx00259c56eee0
+   6.940802352s  INFO ensemble_ddos_detection:   Flow timeout: 120s | Sweep: every 10s
+   6.940803183s  INFO ensemble_ddos_detection: ─────────────────────────────────────────────────
+   6.941007427s  INFO ensemble_ddos_detection: 🎯 Capture started on enx00259c56eee0. Waiting for packets...
+
+   6.941275450s  INFO ensemble_ddos_detection::capture: Capturing on interface: enx00259c56eee0
+   6.958592755s  INFO ensemble_ddos_detection::capture: ✓ First packet received (98 bytes)
+  51.426134666s  INFO ensemble_ddos_detection: [00:44] 📦 1000 pkts (22/s) | 96 active flows | 0 classified | 0 attacks
