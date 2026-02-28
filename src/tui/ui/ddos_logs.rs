@@ -24,12 +24,16 @@ fn render_header(f: &mut Frame, area: Rect) {
     let header = Paragraph::new(Line::from(vec![
         Span::styled(" NetWatch ", Style::default().fg(Color::Cyan).bold()),
         Span::raw("│ "),
-        Span::raw("[1] Dashboard  [2] Connections  [3] Interfaces  [4] Packets  [5] Stats  [6] Topology  [7] Timeline  [8] Insights  "),
-        Span::styled("[9] DDoS Logs", Style::default().fg(Color::Yellow).bold()),
+        Span::raw("[1] Dashboard  [2] Connections  [3] Interfaces  [4] Topology  [5] Timeline  "),
+        Span::styled("[6] DDoS Logs", Style::default().fg(Color::Yellow).bold()),
         Span::raw("  │ "),
         Span::styled(now, Style::default().fg(Color::DarkGray)),
     ]))
-    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)));
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     f.render_widget(header, area);
 }
 
@@ -90,7 +94,7 @@ fn render_footer(f: &mut Frame, app: &App, area: Rect) {
         } else {
             ":Follow  "
         }),
-        Span::styled("1-9", Style::default().fg(Color::Yellow).bold()),
+        Span::styled("1-6", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Tab"),
     ]))
     .block(

@@ -41,11 +41,15 @@ fn render_header(f: &mut Frame, area: Rect) {
         Span::styled(" NetWatch ", Style::default().fg(Color::Cyan).bold()),
         Span::raw("│ "),
         Span::styled("[1] Dashboard", Style::default().fg(Color::Yellow).bold()),
-        Span::raw("  [2] Connections  [3] Interfaces  [4] Packets  [5] Stats  [6] Topology  [7] Timeline  [8] Insights  [9] DDoS Logs"),
+        Span::raw("  [2] Connections  [3] Interfaces  [4] Topology  [5] Timeline  [6] DDoS Logs"),
         Span::raw("  │ "),
         Span::styled(now, Style::default().fg(Color::DarkGray)),
     ]))
-    .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)));
+    .block(
+        Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     f.render_widget(header, area);
 }
 
@@ -484,15 +488,13 @@ fn render_footer(f: &mut Frame, area: Rect) {
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" q", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Quit  "),
-        Span::styled("a", Style::default().fg(Color::Yellow).bold()),
-        Span::raw(":Analyze  "),
         Span::styled("↑↓", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Select  "),
         Span::styled("p", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Pause  "),
         Span::styled("r", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Refresh  "),
-        Span::styled("1-8", Style::default().fg(Color::Yellow).bold()),
+        Span::styled("1-6", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Tab  "),
         Span::styled("g", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Geo  "),

@@ -11,7 +11,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // header
+            Constraint::Length(3), // header
             Constraint::Min(10),   // topology map
             Constraint::Length(3), // summary
             Constraint::Length(3), // footer
@@ -29,9 +29,9 @@ fn render_header(f: &mut Frame, area: Rect) {
     let header = Paragraph::new(Line::from(vec![
         Span::styled(" NetWatch ", Style::default().fg(Color::Cyan).bold()),
         Span::raw("│ "),
-        Span::raw("[1] Dashboard  [9] DDoS Logs  [2] Connections  [9] DDoS Logs  [3] Interfaces  [9] DDoS Logs  [4] Packets  [9] DDoS Logs  [5] Stats  [9] DDoS Logs  "),
-        Span::styled("[6] Topology  [9] DDoS Logs", Style::default().fg(Color::Yellow).bold()),
-        Span::raw("  [7] Timeline  [9] DDoS Logs  [8] Insights  [9] DDoS Logs"),
+        Span::raw("[1] Dashboard  [2] Connections  [3] Interfaces  "),
+        Span::styled("[4] Topology", Style::default().fg(Color::Yellow).bold()),
+        Span::raw("  [5] Timeline  [6] DDoS Logs"),
         Span::raw("  │ "),
         Span::styled(now, Style::default().fg(Color::DarkGray)),
     ]))
@@ -78,9 +78,10 @@ fn build_remote_nodes(app: &App) -> Vec<RemoteNode> {
         }
 
         if let Some(ref name) = conn.process_name
-            && !entry.processes.contains(name) {
-                entry.processes.push(name.clone());
-            }
+            && !entry.processes.contains(name)
+        {
+            entry.processes.push(name.clone());
+        }
 
         let proto = conn.protocol.to_uppercase();
         if !entry.protocols.contains(&proto) {
@@ -138,11 +139,15 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
 
     // Build centre node content
     let hostname = &app.config_collector.config.hostname;
-    let primary_ip = app.interface_info.iter()
+    let primary_ip = app
+        .interface_info
+        .iter()
         .find(|i| i.is_up && i.ipv4.is_some() && i.name != "lo0" && i.name != "lo")
         .and_then(|i| i.ipv4.clone())
         .unwrap_or_else(|| "—".to_string());
-    let iface_names: Vec<&str> = app.interface_info.iter()
+    let iface_names: Vec<&str> = app
+        .interface_info
+        .iter()
         .filter(|i| i.is_up && i.name != "lo0" && i.name != "lo")
         .map(|i| i.name.as_str())
         .collect();
@@ -152,12 +157,26 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
         format!("{} +{}", iface_names[0], iface_names.len() - 1)
     };
 
-    let total_rx: f64 = app.traffic.interfaces.iter()
-        .filter(|i| app.interface_info.iter().any(|info| info.name == i.name && info.is_up && info.name != "lo0" && info.name != "lo"))
+    let total_rx: f64 = app
+        .traffic
+        .interfaces
+        .iter()
+        .filter(|i| {
+            app.interface_info.iter().any(|info| {
+                info.name == i.name && info.is_up && info.name != "lo0" && info.name != "lo"
+            })
+        })
         .map(|i| i.rx_rate)
         .sum();
-    let total_tx: f64 = app.traffic.interfaces.iter()
-        .filter(|i| app.interface_info.iter().any(|info| info.name == i.name && info.is_up && info.name != "lo0" && info.name != "lo"))
+    let total_tx: f64 = app
+        .traffic
+        .interfaces
+        .iter()
+        .filter(|i| {
+            app.interface_info.iter().any(|info| {
+                info.name == i.name && info.is_up && info.name != "lo0" && info.name != "lo"
+            })
+        })
         .map(|i| i.tx_rate)
         .sum();
 
@@ -165,11 +184,23 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
     let center_height = 7u16;
     let center_y = inner.y + 1;
     let center_node = Paragraph::new(vec![
-        Line::from(Span::styled(format!(" {} ", hostname), Style::default().fg(Color::Cyan).bold())),
+        Line::from(Span::styled(
+            format!(" {} ", hostname),
+            Style::default().fg(Color::Cyan).bold(),
+        )),
         Line::from(Span::raw(format!(" {} ", primary_ip))),
-        Line::from(Span::styled(format!(" {} ", iface_str), Style::default().fg(Color::DarkGray))),
-        Line::from(Span::styled(format!(" ↓{} ", widgets::format_bytes_rate(total_rx)), Style::default().fg(Color::Green))),
-        Line::from(Span::styled(format!(" ↑{} ", widgets::format_bytes_rate(total_tx)), Style::default().fg(Color::Blue))),
+        Line::from(Span::styled(
+            format!(" {} ", iface_str),
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(Span::styled(
+            format!(" ↓{} ", widgets::format_bytes_rate(total_rx)),
+            Style::default().fg(Color::Green),
+        )),
+        Line::from(Span::styled(
+            format!(" ↑{} ", widgets::format_bytes_rate(total_tx)),
+            Style::default().fg(Color::Blue),
+        )),
     ])
     .block(
         Block::default()
@@ -186,7 +217,8 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
 
     if let Some(ref gw) = app.config_collector.config.gateway {
         let (dot, style) = health_indicator(hs.gateway_rtt_ms, hs.gateway_loss_pct);
-        let rtt_str = hs.gateway_rtt_ms
+        let rtt_str = hs
+            .gateway_rtt_ms
             .map(|r| format!("{:.1}ms", r))
             .unwrap_or_else(|| "—".to_string());
         left_nodes.push((
@@ -229,7 +261,8 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
             break;
         }
 
-        let lines: Vec<Line> = content.split('\n')
+        let lines: Vec<Line> = content
+            .split('\n')
             .map(|s| Line::from(Span::styled(format!(" {} ", s), *style)))
             .collect();
 
@@ -245,9 +278,10 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
         // Draw edge line from left node to centre
         let edge_y = left_y + left_node_height / 2;
         if edge_y >= inner.y && edge_y < inner.y + inner.height {
-            let edge = Paragraph::new(Line::from(
-                Span::styled("────", Style::default().fg(Color::DarkGray)),
-            ));
+            let edge = Paragraph::new(Line::from(Span::styled(
+                "────",
+                Style::default().fg(Color::DarkGray),
+            )));
             let edge_rect = Rect::new(edge_left_x, edge_y, edge_left_width, 1);
             f.render_widget(edge, edge_rect);
         }
@@ -258,9 +292,13 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
     // Render right-side nodes (remote hosts)
     let right_node_height = 4u16;
     let right_spacing = 1u16;
-    let max_right_nodes = ((inner.height.saturating_sub(2)) / (right_node_height + right_spacing)) as usize;
-    let scroll = app.topology_scroll.min(remotes.len().saturating_sub(max_right_nodes.max(1)));
-    let visible_remotes: Vec<&RemoteNode> = remotes.iter().skip(scroll).take(max_right_nodes).collect();
+    let max_right_nodes =
+        ((inner.height.saturating_sub(2)) / (right_node_height + right_spacing)) as usize;
+    let scroll = app
+        .topology_scroll
+        .min(remotes.len().saturating_sub(max_right_nodes.max(1)));
+    let visible_remotes: Vec<&RemoteNode> =
+        remotes.iter().skip(scroll).take(max_right_nodes).collect();
     let mut right_y = center_y;
 
     for (i, remote) in visible_remotes.iter().enumerate() {
@@ -292,14 +330,21 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
             )),
         ];
         if let Some(ref geo) = remote.geo_label {
-            let truncated: String = geo.chars().take((right_width.saturating_sub(3)) as usize).collect();
+            let truncated: String = geo
+                .chars()
+                .take((right_width.saturating_sub(3)) as usize)
+                .collect();
             lines.push(Line::from(Span::styled(
                 format!(" {} ", truncated),
                 Style::default().fg(Color::DarkGray),
             )));
         }
 
-        let node_h = if remote.geo_label.is_some() { 5u16 } else { right_node_height };
+        let node_h = if remote.geo_label.is_some() {
+            5u16
+        } else {
+            right_node_height
+        };
         let node = Paragraph::new(lines).block(
             Block::default()
                 .borders(Borders::ALL)
@@ -313,9 +358,10 @@ fn render_topology(f: &mut Frame, app: &App, area: Rect) {
         let edge_y = right_y + node_h / 2;
         if edge_y >= inner.y && edge_y < inner.y + inner.height {
             let count_label = format!("{:>2}×", remote.conn_count);
-            let edge = Paragraph::new(Line::from(
-                Span::styled(count_label, Style::default().fg(Color::DarkGray)),
-            ));
+            let edge = Paragraph::new(Line::from(Span::styled(
+                count_label,
+                Style::default().fg(Color::DarkGray),
+            )));
             let edge_rect = Rect::new(edge_right_x, edge_y, edge_right_width, 1);
             f.render_widget(edge, edge_rect);
         }
@@ -361,8 +407,6 @@ fn render_footer(f: &mut Frame, area: Rect) {
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" q", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Quit  "),
-        Span::styled("a", Style::default().fg(Color::Yellow).bold()),
-        Span::raw(":Analyze  "),
         Span::styled("↑↓", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Scroll  "),
         Span::styled("Enter", Style::default().fg(Color::Yellow).bold()),
@@ -371,7 +415,7 @@ fn render_footer(f: &mut Frame, area: Rect) {
         Span::raw(":Pause  "),
         Span::styled("r", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Refresh  "),
-        Span::styled("1-8", Style::default().fg(Color::Yellow).bold()),
+        Span::styled("1-6", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Tab  "),
         Span::styled("g", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Geo  "),
@@ -388,18 +432,12 @@ fn render_footer(f: &mut Frame, area: Rect) {
 
 fn health_indicator(rtt: Option<f64>, loss: f64) -> (String, Style) {
     match rtt {
-        Some(r) if loss == 0.0 && r < 10.0 => {
-            ("●".to_string(), Style::default().fg(Color::Green))
-        }
+        Some(r) if loss == 0.0 && r < 10.0 => ("●".to_string(), Style::default().fg(Color::Green)),
         Some(r) if loss < 50.0 && r < 100.0 => {
             ("●".to_string(), Style::default().fg(Color::Yellow))
         }
-        Some(_) => {
-            ("●".to_string(), Style::default().fg(Color::Red))
-        }
-        None => {
-            ("○".to_string(), Style::default().fg(Color::DarkGray))
-        }
+        Some(_) => ("●".to_string(), Style::default().fg(Color::Red)),
+        None => ("○".to_string(), Style::default().fg(Color::DarkGray)),
     }
 }
 
@@ -411,7 +449,11 @@ fn extract_ip(addr: &str) -> String {
         addr[1..bracket_end].to_string()
     } else if let Some(colon) = addr.rfind(':') {
         let ip = &addr[..colon];
-        if ip == "*" { String::new() } else { ip.to_string() }
+        if ip == "*" {
+            String::new()
+        } else {
+            ip.to_string()
+        }
     } else {
         addr.to_string()
     }

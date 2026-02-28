@@ -11,7 +11,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // header
+            Constraint::Length(3), // header
             Constraint::Min(6),    // timeline chart
             Constraint::Length(3), // legend
             Constraint::Length(3), // summary
@@ -32,11 +32,14 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let header = Paragraph::new(Line::from(vec![
         Span::styled(" NetWatch ", Style::default().fg(Color::Cyan).bold()),
         Span::raw("│ "),
-        Span::raw("[1] Dashboard  [9] DDoS Logs  [2] Connections  [9] DDoS Logs  [3] Interfaces  [9] DDoS Logs  [4] Packets  [9] DDoS Logs  [5] Stats  [9] DDoS Logs  [6] Topology  [9] DDoS Logs  "),
-        Span::styled("[7] Timeline  [9] DDoS Logs", Style::default().fg(Color::Yellow).bold()),
-        Span::raw("  [8] Insights  [9] DDoS Logs"),
+        Span::raw("[1] Dashboard  [2] Connections  [3] Interfaces  [4] Topology  "),
+        Span::styled("[5] Timeline", Style::default().fg(Color::Yellow).bold()),
+        Span::raw("  [6] DDoS Logs"),
         Span::raw("  │ "),
-        Span::styled(format!("last {}", window_label), Style::default().fg(Color::Green)),
+        Span::styled(
+            format!("last {}", window_label),
+            Style::default().fg(Color::Green),
+        ),
         Span::raw("  │ "),
         Span::styled(now, Style::default().fg(Color::DarkGray)),
     ]))
@@ -54,11 +57,15 @@ fn render_chart(f: &mut Frame, app: &App, area: Rect) {
     let window_start = now - std::time::Duration::from_secs(window_secs);
 
     // Sort: active first, then by first_seen (oldest at top)
-    let mut sorted: Vec<&TrackedConnection> = app.connection_timeline.tracked.iter()
+    let mut sorted: Vec<&TrackedConnection> = app
+        .connection_timeline
+        .tracked
+        .iter()
         .filter(|t| t.last_seen >= window_start)
         .collect();
     sorted.sort_by(|a, b| {
-        b.is_active.cmp(&a.is_active)
+        b.is_active
+            .cmp(&a.is_active)
             .then_with(|| a.first_seen.cmp(&b.first_seen))
     });
 
@@ -86,33 +93,48 @@ fn render_chart(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let visible_rows = inner.height as usize;
-    let scroll = app.timeline_scroll.min(sorted.len().saturating_sub(visible_rows.max(1)));
-    let visible: Vec<&TrackedConnection> = sorted.iter().skip(scroll).take(visible_rows).copied().collect();
+    let scroll = app
+        .timeline_scroll
+        .min(sorted.len().saturating_sub(visible_rows.max(1)));
+    let visible: Vec<&TrackedConnection> = sorted
+        .iter()
+        .skip(scroll)
+        .take(visible_rows)
+        .copied()
+        .collect();
 
-    let lines: Vec<Line> = visible.iter().enumerate().map(|(i, tracked)| {
-        let is_selected = i + scroll == app.timeline_scroll;
+    let lines: Vec<Line> = visible
+        .iter()
+        .enumerate()
+        .map(|(i, tracked)| {
+            let is_selected = i + scroll == app.timeline_scroll;
 
-        // Build label: "process    remote_ip"
-        let proc_name = tracked.process_name.as_deref().unwrap_or("—");
-        let remote = extract_ip(&tracked.key.remote_addr);
-        let label = format!(" {:<10} {:<12}", truncate(proc_name, 10), truncate(&remote, 12));
+            // Build label: "process    remote_ip"
+            let proc_name = tracked.process_name.as_deref().unwrap_or("—");
+            let remote = extract_ip(&tracked.key.remote_addr);
+            let label = format!(
+                " {:<10} {:<12}",
+                truncate(proc_name, 10),
+                truncate(&remote, 12)
+            );
 
-        let label_style = if is_selected {
-            Style::default().fg(Color::Yellow).bold()
-        } else if tracked.is_active {
-            Style::default().fg(Color::White)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
+            let label_style = if is_selected {
+                Style::default().fg(Color::Yellow).bold()
+            } else if tracked.is_active {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
 
-        // Build the bar
-        let bar = render_bar(tracked, now, window_start, bar_width);
+            // Build the bar
+            let bar = render_bar(tracked, now, window_start, bar_width);
 
-        let mut spans = vec![Span::styled(label, label_style), Span::raw(" ")];
-        spans.extend(bar);
+            let mut spans = vec![Span::styled(label, label_style), Span::raw(" ")];
+            spans.extend(bar);
 
-        Line::from(spans)
-    }).collect();
+            Line::from(spans)
+        })
+        .collect();
 
     let content = Paragraph::new(lines);
     f.render_widget(content, inner);
@@ -219,8 +241,18 @@ fn render_legend(f: &mut Frame, area: Rect) {
 }
 
 fn render_summary(f: &mut Frame, app: &App, area: Rect) {
-    let active = app.connection_timeline.tracked.iter().filter(|t| t.is_active).count();
-    let closed = app.connection_timeline.tracked.iter().filter(|t| !t.is_active).count();
+    let active = app
+        .connection_timeline
+        .tracked
+        .iter()
+        .filter(|t| t.is_active)
+        .count();
+    let closed = app
+        .connection_timeline
+        .tracked
+        .iter()
+        .filter(|t| !t.is_active)
+        .count();
     let total = app.connection_timeline.tracked.len();
 
     let summary = Paragraph::new(Line::from(vec![
@@ -245,8 +277,6 @@ fn render_footer(f: &mut Frame, area: Rect) {
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" q", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Quit  "),
-        Span::styled("a", Style::default().fg(Color::Yellow).bold()),
-        Span::raw(":Analyze  "),
         Span::styled("↑↓", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Scroll  "),
         Span::styled("Enter", Style::default().fg(Color::Yellow).bold()),
@@ -257,7 +287,7 @@ fn render_footer(f: &mut Frame, area: Rect) {
         Span::raw(":Pause  "),
         Span::styled("r", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Refresh  "),
-        Span::styled("1-8", Style::default().fg(Color::Yellow).bold()),
+        Span::styled("1-6", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Tab  "),
         Span::styled("g", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Geo  "),
@@ -280,7 +310,11 @@ fn extract_ip(addr: &str) -> String {
         addr[1..bracket_end].to_string()
     } else if let Some(colon) = addr.rfind(':') {
         let ip = &addr[..colon];
-        if ip == "*" { "—".to_string() } else { ip.to_string() }
+        if ip == "*" {
+            "—".to_string()
+        } else {
+            ip.to_string()
+        }
     } else {
         addr.to_string()
     }

@@ -10,7 +10,7 @@ pub fn render(f: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // header
-            Constraint::Min(8),   // interface detail table
+            Constraint::Min(8),    // interface detail table
             Constraint::Length(5), // sparkline
             Constraint::Length(3), // footer
         ])
@@ -27,9 +27,9 @@ fn render_header(f: &mut Frame, area: Rect) {
     let header = Paragraph::new(Line::from(vec![
         Span::styled(" NetWatch ", Style::default().fg(Color::Cyan).bold()),
         Span::raw("│ "),
-        Span::raw("[1] Dashboard  [9] DDoS Logs  [2] Connections  [9] DDoS Logs  "),
-        Span::styled("[3] Interfaces  [9] DDoS Logs", Style::default().fg(Color::Yellow).bold()),
-        Span::raw("  [4] Packets  [9] DDoS Logs  [5] Stats  [9] DDoS Logs  [6] Topology  [9] DDoS Logs  [7] Timeline  [9] DDoS Logs  [8] Insights  [9] DDoS Logs"),
+        Span::raw("[1] Dashboard  [2] Connections  "),
+        Span::styled("[3] Interfaces", Style::default().fg(Color::Yellow).bold()),
+        Span::raw("  [4] Topology  [5] Timeline  [6] DDoS Logs"),
         Span::raw("  │ "),
         Span::styled(now, Style::default().fg(Color::DarkGray)),
     ]))
@@ -148,7 +148,9 @@ fn render_detail_table(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_sparkline(f: &mut Frame, app: &App, area: Rect) {
-    let selected = app.selected_interface.and_then(|i| app.traffic.interfaces.get(i));
+    let selected = app
+        .selected_interface
+        .and_then(|i| app.traffic.interfaces.get(i));
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -192,15 +194,13 @@ fn render_footer(f: &mut Frame, area: Rect) {
     let footer = Paragraph::new(Line::from(vec![
         Span::styled(" q", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Quit  "),
-        Span::styled("a", Style::default().fg(Color::Yellow).bold()),
-        Span::raw(":Analyze  "),
         Span::styled("↑↓", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Select  "),
         Span::styled("p", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Pause  "),
         Span::styled("r", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Refresh  "),
-        Span::styled("1-8", Style::default().fg(Color::Yellow).bold()),
+        Span::styled("1-6", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Tab  "),
         Span::styled("g", Style::default().fg(Color::Yellow).bold()),
         Span::raw(":Geo  "),

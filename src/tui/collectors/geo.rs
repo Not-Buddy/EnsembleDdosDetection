@@ -9,7 +9,6 @@ const GEO_CACHE_MAX: usize = 4096;
 #[derive(Clone, Debug)]
 pub struct GeoInfo {
     pub country_code: String,
-    pub country: String,
     pub city: String,
     pub org: String,
 }
@@ -45,12 +44,18 @@ impl GeoCache {
                 let result = lookup_geo(&ip);
                 let mut c = resolver_cache.lock().unwrap();
                 match result {
-                    Some(info) => { c.insert(ip, GeoEntry::Resolved(info)); }
-                    None => { c.insert(ip, GeoEntry::Failed); }
+                    Some(info) => {
+                        c.insert(ip, GeoEntry::Resolved(info));
+                    }
+                    None => {
+                        c.insert(ip, GeoEntry::Failed);
+                    }
                 }
                 if c.len() > GEO_CACHE_MAX {
                     let keys: Vec<String> = c.keys().take(GEO_CACHE_MAX / 4).cloned().collect();
-                    for k in keys { c.remove(&k); }
+                    for k in keys {
+                        c.remove(&k);
+                    }
                 }
             }
         });
@@ -93,7 +98,10 @@ fn is_private_ip(ip: &str) -> bool {
 }
 
 fn lookup_geo(ip: &str) -> Option<GeoInfo> {
-    let url = format!("http://ip-api.com/json/{}?fields=status,country,countryCode,city,org,as", ip);
+    let url = format!(
+        "http://ip-api.com/json/{}?fields=status,country,countryCode,city,org,as",
+        ip
+    );
     let resp = ureq::get(&url).call().ok()?;
     let body = resp.into_string().ok()?;
     let v: serde_json::Value = serde_json::from_str(&body).ok()?;
@@ -104,9 +112,9 @@ fn lookup_geo(ip: &str) -> Option<GeoInfo> {
 
     Some(GeoInfo {
         country_code: v.get("countryCode")?.as_str()?.to_string(),
-        country: v.get("country")?.as_str()?.to_string(),
         city: v.get("city")?.as_str().unwrap_or("").to_string(),
-        org: v.get("org")
+        org: v
+            .get("org")
             .or_else(|| v.get("as"))
             .and_then(|v| v.as_str())
             .unwrap_or("")
