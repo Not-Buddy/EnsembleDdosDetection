@@ -251,7 +251,6 @@ async fn main() -> Result<()> {
                                     proto_name(flow_state.key.protocol),
                                     result.combined_prob,
                                 );
-                                
                                 if let Ok(mut alerts) = ml_logs_worker.lock() {
                                     alerts.push(alert_msg);
                                     if alerts.len() > 1000 {

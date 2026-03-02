@@ -77,10 +77,7 @@ pub fn collect_interface_info() -> Result<Vec<InterfaceInfo>> {
         } else if let Some(ref mut iface) = current {
             let trimmed = line.trim();
             if trimmed.starts_with("inet ") {
-                iface.ipv4 = trimmed
-                    .split_whitespace()
-                    .nth(1)
-                    .map(|s| s.to_string());
+                iface.ipv4 = trimmed.split_whitespace().nth(1).map(|s| s.to_string());
             } else if trimmed.starts_with("inet6 ") {
                 if iface.ipv6.is_none() {
                     iface.ipv6 = trimmed
@@ -89,10 +86,7 @@ pub fn collect_interface_info() -> Result<Vec<InterfaceInfo>> {
                         .map(|s| s.split('%').next().unwrap_or(s).to_string());
                 }
             } else if trimmed.starts_with("ether ") {
-                iface.mac = trimmed
-                    .split_whitespace()
-                    .nth(1)
-                    .map(|s| s.to_string());
+                iface.mac = trimmed.split_whitespace().nth(1).map(|s| s.to_string());
             }
         }
     }

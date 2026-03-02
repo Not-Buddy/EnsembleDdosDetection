@@ -114,7 +114,9 @@ impl ConnectionTimeline {
 
         // Evict oldest inactive connections if over limit
         if self.tracked.len() > MAX_TRACKED_CONNECTIONS {
-            let mut inactive_indices: Vec<usize> = self.tracked.iter()
+            let mut inactive_indices: Vec<usize> = self
+                .tracked
+                .iter()
                 .enumerate()
                 .filter(|(_, t)| !t.is_active)
                 .map(|(i, _)| i)
@@ -125,7 +127,8 @@ impl ConnectionTimeline {
             let remove_set: HashSet<usize> = inactive_indices.into_iter().take(to_remove).collect();
 
             if !remove_set.is_empty() {
-                let removed_keys: Vec<ConnectionKey> = remove_set.iter()
+                let removed_keys: Vec<ConnectionKey> = remove_set
+                    .iter()
                     .map(|&i| self.tracked[i].key.clone())
                     .collect();
                 for key in &removed_keys {
@@ -246,10 +249,7 @@ fn parse_linux_connections() -> Vec<Connection> {
 #[cfg(target_os = "linux")]
 fn parse_ss_process(field: &str) -> (Option<u32>, Option<String>) {
     // Format: users:(("process",pid=1234,fd=3))
-    let name = field
-        .split('"')
-        .nth(1)
-        .map(|s| s.to_string());
+    let name = field.split('"').nth(1).map(|s| s.to_string());
 
     let pid = field
         .split("pid=")
@@ -267,7 +267,10 @@ fn resolve_pids(pids: &[u32]) -> HashMap<u32, String> {
         return map;
     }
 
-    let output = match Command::new("tasklist").args(["/FO", "CSV", "/NH"]).output() {
+    let output = match Command::new("tasklist")
+        .args(["/FO", "CSV", "/NH"])
+        .output()
+    {
         Ok(o) => o,
         Err(_) => return map,
     };
@@ -327,14 +330,26 @@ fn parse_windows_connections() -> Vec<Connection> {
                 continue;
             }
             let pid: Option<u32> = cols[3].parse().ok();
-            (cols[0].to_string(), cols[1].to_string(), cols[2].to_string(), String::new(), pid)
+            (
+                cols[0].to_string(),
+                cols[1].to_string(),
+                cols[2].to_string(),
+                String::new(),
+                pid,
+            )
         } else {
             // TCP lines: Proto LocalAddr ForeignAddr State PID
             if cols.len() < 5 {
                 continue;
             }
             let pid: Option<u32> = cols[4].parse().ok();
-            (cols[0].to_string(), cols[1].to_string(), cols[2].to_string(), cols[3].to_string(), pid)
+            (
+                cols[0].to_string(),
+                cols[1].to_string(),
+                cols[2].to_string(),
+                cols[3].to_string(),
+                pid,
+            )
         };
 
         if let Some(p) = pid {

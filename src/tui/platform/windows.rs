@@ -39,10 +39,7 @@ fn collect_stats_powershell() -> Result<HashMap<String, InterfaceStats>> {
     };
 
     for adapter in &adapters {
-        let name = adapter["Name"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
+        let name = adapter["Name"].as_str().unwrap_or_default().to_string();
         if name.is_empty() {
             continue;
         }
@@ -199,11 +196,7 @@ fn extract_value(line: &str) -> Option<String> {
     let parts: Vec<&str> = line.splitn(2, ':').collect();
     if parts.len() == 2 {
         let val = parts[1].trim().to_string();
-        if val.is_empty() {
-            None
-        } else {
-            Some(val)
-        }
+        if val.is_empty() { None } else { Some(val) }
     } else {
         None
     }

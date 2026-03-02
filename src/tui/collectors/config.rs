@@ -64,7 +64,10 @@ fn collect_gateway() -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn collect_gateway() -> Option<String> {
-    let output = Command::new("route").args(["print", "0.0.0.0"]).output().ok()?;
+    let output = Command::new("route")
+        .args(["print", "0.0.0.0"])
+        .output()
+        .ok()?;
     let text = String::from_utf8_lossy(&output.stdout);
     for line in text.lines() {
         let cols: Vec<&str> = line.split_whitespace().collect();
@@ -84,9 +87,10 @@ fn collect_dns() -> Vec<String> {
         for line in contents.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("nameserver ")
-                && let Some(addr) = trimmed.split_whitespace().nth(1) {
-                    servers.push(addr.to_string());
-                }
+                && let Some(addr) = trimmed.split_whitespace().nth(1)
+            {
+                servers.push(addr.to_string());
+            }
         }
     }
 
@@ -114,14 +118,24 @@ fn collect_dns() -> Vec<String> {
             let text = String::from_utf8_lossy(&output.stdout);
             for line in text.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("DNS Servers") || (trimmed.starts_with("DNS") && trimmed.contains("Server")) {
+                if trimmed.starts_with("DNS Servers")
+                    || (trimmed.starts_with("DNS") && trimmed.contains("Server"))
+                {
                     if let Some(addr) = trimmed.split(':').last() {
                         let addr = addr.trim().to_string();
                         if !addr.is_empty() && !servers.contains(&addr) {
                             servers.push(addr);
                         }
                     }
-                } else if !trimmed.is_empty() && servers.len() > 0 && !trimmed.contains(':') && trimmed.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                } else if !trimmed.is_empty()
+                    && servers.len() > 0
+                    && !trimmed.contains(':')
+                    && trimmed
+                        .chars()
+                        .next()
+                        .map(|c| c.is_ascii_digit())
+                        .unwrap_or(false)
+                {
                     // Continuation lines for additional DNS servers (indented IPs)
                     let addr = trimmed.to_string();
                     if !servers.contains(&addr) {

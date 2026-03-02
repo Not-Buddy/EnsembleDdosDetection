@@ -44,6 +44,26 @@ sudo ./target/release/ensemble-ddos-detection \
 
 The agent captures live traffic, groups packets into bidirectional flows, computes 54 CICFlowMeter-style features per flow, and runs the ensemble through ONNX Runtime. Detected attacks are logged with 🚨 alerts showing source/destination IPs, protocol, and the combined detection probability.
 
+
+## Model Performance
+
+| Metric | Score |
+|---|---|
+| **F1 Score** | 0.995 |
+| **Accuracy** | 99.0% |
+| **Benign Recall** | 92.3% |
+| **Attack Recall** | 99.6% |
+| **ROC-AUC** | 0.996 |
+
+### ROC Curve
+
+![ROC Curve](outputs/roc_curve.png)
+
+### Confusion Matrix
+
+![Confusion Matrix](outputs/confusion_matrix.png)
+
+
 ## Architecture
 
 ### ML Processing Pipeline
@@ -267,21 +287,3 @@ models/exported/                  # Trained model artifacts
 
 train.py                          # Python CLI entry-point
 ```
-
-## Model Performance
-
-| Metric | Score |
-|---|---|
-| **F1 Score** | 0.995 |
-| **Accuracy** | 99.0% |
-| **Benign Recall** | 92.3% |
-| **Attack Recall** | 99.6% |
-| **ROC-AUC** | 0.996 |
-
-### ROC Curve
-
-![ROC Curve](outputs/roc_curve.png)
-
-### Confusion Matrix
-
-![Confusion Matrix](outputs/confusion_matrix.png)
